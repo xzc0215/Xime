@@ -62,6 +62,7 @@ object SettingsRoutes {
     const val About = "about"
     const val Privacy = "privacy"
     const val Licenses = "licenses"
+    const val LogViewer = "log_viewer"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,7 +85,8 @@ fun SettingsScreen(
                 onNavigateToKeyEffect = { navController.navigate(SettingsRoutes.KeyEffect) },
                 onNavigateToDictionary = { navController.navigate(SettingsRoutes.Dictionary) },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
-                onNavigateToAbout = { navController.navigate(SettingsRoutes.About) }
+                onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
+                onNavigateToLogViewer = { navController.navigate(SettingsRoutes.LogViewer) }
             )
         }
         composable(SettingsRoutes.Schema) {
@@ -126,11 +128,16 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(SettingsRoutes.About) {
+composable(SettingsRoutes.About) {
             AboutContent(
                 onBack = { navController.popBackStack() },
                 onNavigateToPrivacy = { navController.navigate(SettingsRoutes.Privacy) },
                 onNavigateToLicenses = { navController.navigate(SettingsRoutes.Licenses) }
+            )
+        }
+        composable(SettingsRoutes.LogViewer) {
+            LogViewerScreen(
+                onBack = { navController.popBackStack() }
             )
         }
         composable(SettingsRoutes.Privacy) {
@@ -154,7 +161,8 @@ fun SettingsMainContent(
     onNavigateToKeyEffect: () -> Unit,
     onNavigateToDictionary: () -> Unit,
     onNavigateToPlugins: () -> Unit,
-    onNavigateToAbout: () -> Unit
+    onNavigateToAbout: () -> Unit,
+    onNavigateToLogViewer: () -> Unit
 ) {
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -337,12 +345,24 @@ fun SettingsMainContent(
             }
             
             item {
-                SettingsSection(title = "关于", content = {
+SettingsSection(title = "关于", content = {
                     SettingsItem(
                         icon = Icons.Outlined.Info,
                         title = "关于 Kime",
-                        subtitle = "版本 ${com.kingzcheung.kime.BuildConfig.VERSION_NAME}",
+                        subtitle = "版本信息、开发者、联系方式",
                         onClick = onNavigateToAbout,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.Outlined.Description,
+                        title = "日志查看器",
+                        subtitle = "查看应用运行日志，便于排查问题",
+                        onClick = onNavigateToLogViewer,
                         showArrow = true
                     )
                 })

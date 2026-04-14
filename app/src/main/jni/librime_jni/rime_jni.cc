@@ -34,16 +34,21 @@ public:
             return;
         }
 
+        // 设置日志目录为用户数据目录下的 logs 子目录
+        std::string log_dir = std::string(user_data_dir) + "/logs";
+        
         RIME_STRUCT(RimeTraits, traits);
         traits.shared_data_dir = shared_data_dir;
         traits.user_data_dir = user_data_dir;
-        traits.log_dir = "";  // 禁用文件日志，只输出到 logcat
+        traits.log_dir = log_dir.c_str();  // 启用文件日志，写入到 user_data_dir/logs/
+        traits.min_log_level = 1;  // 只记录 WARNING 及以上级别，避免过多 INFO 日志
         traits.app_name = "rime.kime";
         traits.distribution_name = "Kime";
         traits.distribution_code_name = "kime";
         traits.distribution_version = "1.0.0";
 
-        LOGI("Setting up Rime with shared_data_dir=%s, user_data_dir=%s", shared_data_dir, user_data_dir);
+        LOGI("Setting up Rime with shared_data_dir=%s, user_data_dir=%s, log_dir=%s", 
+             shared_data_dir, user_data_dir, log_dir.c_str());
         
         // 第一步：setup
         rime->setup(&traits);

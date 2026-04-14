@@ -42,6 +42,7 @@ import com.kingzcheung.kime.rime.RimeConfigHelper
 import com.kingzcheung.kime.rime.RimeEngine
 import com.kingzcheung.kime.settings.SchemaConfigHelper
 import com.kingzcheung.kime.settings.SettingsPreferences
+import com.kingzcheung.kime.util.FileLogger
 import com.kingzcheung.kime.ui.KeysConfigHelper
 import com.kingzcheung.kime.ui.theme.KimeTheme
 import com.kingzcheung.kime.ui.KeyboardView
@@ -193,7 +194,7 @@ class KimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return uiState.value.darkMode == DARK_MODE_DARK
     }
 
-    override fun onCreate() {
+override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
         window.window?.decorView?.setViewTreeLifecycleOwner(this)
@@ -201,28 +202,33 @@ class KimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         
+        // 初始化文件日志系统
+        FileLogger.init(this)
+        FileLogger.i(TAG, "KimeInputMethodService created")
+        
         loadDarkModePreference()
         initRimeEngine()
         initClipboardManager()
         initAssociationEngine()
+        
+        FileLogger.i(TAG, "Service initialization completed")
     }
     
 /**
      * 初始化插件系统（包括联想插件）
      */
     private fun initAssociationEngine() {
-        // 初始化文件日志系统
-        com.kingzcheung.kime.util.FileLogger.init(this)
+        FileLogger.i(TAG, "Initializing plugin system")
         
         if (!ExtensionManager.isInitialized()) {
-            Log.i(TAG, "Initializing ExtensionManager...")
+            FileLogger.d(TAG, "ExtensionManager not initialized, initializing...")
             ExtensionManager.initialize(this)
         }
         
         if (ExtensionManager.hasPredictionPlugins(this)) {
-            Log.i(TAG, "Prediction plugins available")
+            FileLogger.i(TAG, "Prediction plugins available")
         } else {
-            Log.w(TAG, "No prediction plugins available")
+            FileLogger.w(TAG, "No prediction plugins available")
         }
     }
     
@@ -230,13 +236,12 @@ class KimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 检查并初始化插件系统
      */
     private fun checkAndInitializeAssociationEngine() {
-        // 初始化文件日志系统
-        if (!com.kingzcheung.kime.util.FileLogger.isInitialized()) {
-            com.kingzcheung.kime.util.FileLogger.init(this)
+        if (!FileLogger.isInitialized()) {
+            FileLogger.init(this)
         }
         
         if (!ExtensionManager.isInitialized()) {
-            Log.i(TAG, "ExtensionManager not initialized, initializing now...")
+            FileLogger.i(TAG, "ExtensionManager not initialized, initializing now...")
             ExtensionManager.initialize(this)
         }
     }
