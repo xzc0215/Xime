@@ -2,21 +2,15 @@ package com.kingzcheung.kime.service
 
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
-import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.Log
 import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputContentInfo
-import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,7 +39,6 @@ import com.kingzcheung.kime.rime.RimeConfigHelper
 import com.kingzcheung.kime.rime.RimeEngine
 import com.kingzcheung.kime.settings.SchemaConfigHelper
 import com.kingzcheung.kime.settings.SettingsPreferences
-import com.kingzcheung.kime.speech.SpeechRecognitionManager
 import com.kingzcheung.kime.ui.KeyboardView
 import com.kingzcheung.kime.ui.KeysConfigHelper
 import com.kingzcheung.kime.ui.theme.KimeTheme
@@ -59,13 +52,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 
-/**
- * Kime 输入法服务
- * 使用 Jetpack Compose 构建输入法 UI
- * 集成 Rime 引擎实现五笔输入
- * 
- * 参考 trime 的 LifecycleInputMethodService 实现
- */
 class KimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
     companion object {
@@ -83,96 +69,38 @@ class KimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
-    // Rime 引擎实例
     private val rimeEngine = RimeEngine.getInstance()
     
     private lateinit var clipboardManager: ClipboardManager
     
-    // 协程作用域
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
-    // 主线程 Handler
     private val mainHandler = Handler(Looper.getMainLooper())
     
-    // UI 状态 - 合并为单一状态对象，减少Compose重组
     private val uiState = mutableStateOf(InputUIState())
     private val clipboardItemsState = mutableStateOf<List<com.kingzcheung.kime.clipboard.ClipboardItem>>(emptyList())
     private val quickSendItemsState = mutableStateOf<List<com.kingzcheung.kime.clipboard.ClipboardItem>>(emptyList())
     
-    // 语音模式状态
     private var isTrackingVoiceButtons = false
     private var voiceRecordingStarted = false
-    private var textBeforeVoiceInput = ""
-    private var textLengthBeforeVoiceInput = 0
     
-    // 最近上屏的文本（用于联想）
-    private var lastCommittedText = ""
+    private val predictionManager = PredictionManager(
+        context = this,
+        serviceScope = serviceScope,
+        onStateChanged = { newState -> uiState.value = newState },
+        getState = { uiState.value }
+    )
     
-    // 语音识别管理器
-    private lateinit var speechRecognitionManager: SpeechRecognitionManager
+    private val voiceRecognitionHandler = VoiceRecognitionHandler(
+        context = this,
+        onStateChanged = { newState -> uiState.value = newState },
+        getState = { uiState.value },
+        getInputConnection = { currentInputConnection }
+    )
     
-    // SharedPreferences 监听器
     private var sharedPrefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
     
-    // 音频和振动
-    private val audioManager: AudioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
-    private val vibrator: Vibrator by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(VIBRATOR_SERVICE) as Vibrator
-        }
-    }
-    
-    private fun playKeySound(keyType: String = "standard") {
-        if (!SettingsPreferences.isSoundEnabled(this)) return
-        
-        val volume = SettingsPreferences.getSoundVolume(this) / 100f
-        val soundVolume = (volume * 100).toInt()
-        
-        val effectType = when (keyType) {
-            "delete" -> AudioManager.FX_KEYPRESS_DELETE
-            "enter" -> AudioManager.FX_KEYPRESS_RETURN
-            "space" -> AudioManager.FX_KEYPRESS_SPACEBAR
-            else -> AudioManager.FX_KEYPRESS_STANDARD
-        }
-        
-        audioManager.playSoundEffect(effectType, soundVolume / 100f)
-    }
-    
-    private fun performVibration() {
-        if (!SettingsPreferences.isVibrationEnabled(this)) return
-        if (!vibrator.hasVibrator()) return
-        
-        val intensity = SettingsPreferences.getVibrationIntensity(this)
-        val duration = 10L + (intensity * 0.4).toLong()
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val amplitude = (intensity * 2.55).toInt().coerceIn(1, 255)
-            vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(duration)
-        }
-    }
-    
-    private fun performKeyPressEffect(keyType: String = "standard") {
-        playKeySound(keyType)
-        performVibration()
-    }
-    
-    private fun performKeyPressDownEffect(key: String) {
-        val keyType = when (key) {
-            "delete", "clear_composition" -> "delete"
-            "enter" -> "enter"
-            "space" -> "space"
-            else -> "standard"
-        }
-        playKeySound(keyType)
-        performVibration()
-    }
+    private val feedbackManager = FeedbackManager(this)
     
     private fun loadDarkModePreference() {
         uiState.value = uiState.value.copy(
@@ -209,7 +137,7 @@ class KimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return uiState.value.darkMode == DARK_MODE_DARK
     }
 
-override fun onCreate() {
+    override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
         window.window?.decorView?.setViewTreeLifecycleOwner(this)
@@ -217,16 +145,12 @@ override fun onCreate() {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         
-        // 初始化文件日志系统
         FileLogger.init(this)
         FileLogger.i(TAG, "KimeInputMethodService created")
         
         loadDarkModePreference()
-        
-        // 注册 SharedPreferences 监听器，实时监听设置变化
         registerSharedPrefsListener()
         
-        // 所有耗时初始化移到后台线程
         serviceScope.launch(Dispatchers.IO) {
             try {
                 initRimeEngine()
@@ -243,190 +167,22 @@ override fun onCreate() {
         }
     }
     
-    /**
-     * 初始化语音识别系统
-     */
     private fun initSpeechRecognition() {
-        FileLogger.i(TAG, "Initializing speech recognition system")
-        
-        speechRecognitionManager = SpeechRecognitionManager(this)
-        
-        speechRecognitionManager.setCallbacks(
-            onResult = { text ->
-                handleSpeechResult(text)
-            },
-            onStateChange = { state ->
-                handleSpeechStateChange(state)
-            },
-            onError = { error ->
-                handleSpeechError(error)
-            },
-            onAmplitude = { amplitude ->
-                handleAmplitudeUpdate(amplitude)
-            }
-        )
-        
-        val apiKey = SettingsPreferences.getFunAsrApiKey(this)
-        val sttProvider = SettingsPreferences.getSttProvider(this)
-        
-        val providerName = when (sttProvider) {
-            "funasr" -> if (apiKey.isNotEmpty()) "阿里百炼" else "未配置"
-            else -> "未配置"
-        }
-        
-        uiState.value = uiState.value.copy(voicePluginName = providerName)
-        
-        if (apiKey.isNotEmpty()) {
-            FileLogger.i(TAG, "STT provider: $sttProvider, configured")
-        } else {
-            FileLogger.w(TAG, "STT provider: $sttProvider, not configured")
-        }
+        voiceRecognitionHandler.initialize()
     }
     
-    private fun handleSpeechResult(text: String) {
-        Log.d(TAG, "Speech result: $text")
-        
-        if (text.isNotEmpty() && !text.startsWith("错误:")) {
-            currentInputConnection?.commitText(text, 1)
-            lastCommittedText = text
-            uiState.value = uiState.value.copy(voiceRecognizedText = text)
-        }
+    private fun initAssociationEngine() {
+        predictionManager.initialize()
     }
     
-    private fun handleSpeechStateChange(state: RecognitionState) {
-        Log.d(TAG, "Speech state changed: $state")
-        uiState.value = uiState.value.copy(voiceRecognitionState = state)
-    }
-    
-    private fun handleSpeechError(error: String) {
-        Log.e(TAG, "Speech error: $error")
-        FileLogger.e(TAG, "Speech error: $error")
-        uiState.value = uiState.value.copy(
-            voiceRecognitionState = RecognitionState.ERROR,
-            voiceRecognizedText = "",
-            voiceAmplitude = 0f
-        )
-    }
-    
-    private fun handleAmplitudeUpdate(amplitude: Float) {
-        uiState.value = uiState.value.copy(voiceAmplitude = amplitude)
-    }
-    
-private fun initAssociationEngine() {
-        FileLogger.i(TAG, "Initializing association system")
-        
-        serviceScope.launch(Dispatchers.IO) {
-            try {
-                val trieInit = AssociationService.initialize(this@KimeInputMethodService)
-                if (trieInit) {
-                    FileLogger.i(TAG, "Trie association service initialized")
-                } else {
-                    FileLogger.w(TAG, "Trie association service initialization failed")
-                }
-                
-                if (!ExtensionManager.isInitialized()) {
-                    FileLogger.d(TAG, "ExtensionManager not initialized, initializing...")
-                    ExtensionManager.initialize(this@KimeInputMethodService)
-                }
-                
-                if (SettingsPreferences.isSmartPredictionEnabled(this@KimeInputMethodService)) {
-                    try {
-                        val initialized = AssociationManager.initialize(this@KimeInputMethodService)
-                        if (initialized) {
-                            FileLogger.i(TAG, "Smart prediction initialized")
-                        } else {
-                            FileLogger.w(TAG, "Smart prediction initialization failed")
-                        }
-                    } catch (e: Exception) {
-                        FileLogger.e(TAG, "Failed to initialize smart prediction: ${e.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                FileLogger.e(TAG, "Failed to initialize association system: ${e.message}")
-            }
-        }
-    }
-    
-    /**
-     * 检查并初始化插件系统
-     */
     private fun checkAndInitializeAssociationEngine() {
-        if (!FileLogger.isInitialized()) {
-            FileLogger.init(this)
-        }
-        
-        serviceScope.launch(Dispatchers.IO) {
-            try {
-                if (!ExtensionManager.isInitialized()) {
-                    FileLogger.i(TAG, "ExtensionManager not initialized, initializing now...")
-                    ExtensionManager.initialize(this@KimeInputMethodService)
-                }
-                
-                if (SettingsPreferences.isSmartPredictionEnabled(this@KimeInputMethodService)) {
-                    try {
-                        val initialized = AssociationManager.initialize(this@KimeInputMethodService)
-                        if (initialized) {
-                            FileLogger.i(TAG, "Smart prediction initialized in checkAndInitialize")
-                        } else {
-                            FileLogger.w(TAG, "Smart prediction initialization failed in checkAndInitialize")
-                        }
-                    } catch (e: Exception) {
-                        FileLogger.e(TAG, "Failed to initialize smart prediction: ${e.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                FileLogger.e(TAG, "Failed to initialize in checkAndInitialize: ${e.message}")
-            }
-        }
+        predictionManager.checkAndInitialize()
     }
     
-    /**
-     * 从插件获取联想词
-     */
-private fun getPredictionFromPlugin(contextText: String) {
-        if (contextText.isEmpty()) {
-            uiState.value = uiState.value.copy(associationCandidates = emptyArray())
-            return
-        }
-        
-        if (!SettingsPreferences.isSmartPredictionEnabled(this)) {
-            uiState.value = uiState.value.copy(associationCandidates = emptyArray())
-            return
-        }
-        
-        serviceScope.launch {
-            try {
-                if (!AssociationManager.isInitialized()) {
-                    Log.d(TAG, "AssociationManager not initialized, initializing...")
-                    val initSuccess = AssociationManager.initialize(this@KimeInputMethodService)
-                    if (!initSuccess) {
-                        Log.e(TAG, "Failed to initialize AssociationManager")
-                        withContext(Dispatchers.Main) {
-                            uiState.value = uiState.value.copy(associationCandidates = emptyArray())
-                        }
-                        return@launch
-                    }
-                }
-                
-                val candidates = AssociationManager.predict(contextText, 5)
-                
-                Log.d(TAG, "Prediction candidates: ${candidates.map { it.text }}")
-                
-                withContext(Dispatchers.Main) {
-                    uiState.value = uiState.value.copy(associationCandidates = candidates.map { it.text }.toTypedArray())
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Prediction failed", e)
-                withContext(Dispatchers.Main) {
-                    uiState.value = uiState.value.copy(associationCandidates = emptyArray())
-                }
-            }
-        }
+    private fun getPredictionFromPlugin(contextText: String) {
+        predictionManager.getPrediction(contextText)
     }
     
-    /**
-     * 初始化 Rime 引擎
-     */
     private fun initRimeEngine() {
         Log.d(TAG, "initRimeEngine: Starting initialization...")
         try {
@@ -459,9 +215,6 @@ private fun getPredictionFromPlugin(contextText: String) {
         }
     }
     
-    /**
-     * 初始化剪切板管理器
-     */
     private fun initClipboardManager() {
         Log.d(TAG, "initClipboardManager: Starting initialization...")
         try {
@@ -487,10 +240,18 @@ private fun getPredictionFromPlugin(contextText: String) {
     }
 
     override fun onCreateInputView(): View {
-        // 创建自定义 FrameLayout 处理全局触摸事件
-        val container = VoiceKeyboardContainer(this)
+        val container = VoiceKeyboardContainer(
+            context = this,
+            uiStateProvider = { uiState.value },
+            onUiStateChanged = { newState -> uiState.value = newState },
+            onPerformVibration = { feedbackManager.performVibration() },
+            onPerformUndo = { performUndo() },
+            onPerformSearch = { performSearch() },
+            onStopRecognition = { voiceRecognitionHandler.stopRecognition() },
+            isRecording = { voiceRecordingStarted },
+            setRecording = { voiceRecordingStarted = it }
+        )
         
-        // 创建 ComposeView
         val composeView = ComposeView(this).apply {
             setContent {
                 val state = uiState.value
@@ -529,7 +290,7 @@ private fun getPredictionFromPlugin(contextText: String) {
                                 handleKeyPress(key, isShifted)
                             },
                             onKeyPressDown = { key ->
-                                performKeyPressDownEffect(key)
+                                feedbackManager.performKeyPressDownEffect(key)
                             },
                             onCandidateSelect = { index ->
                                 selectCandidate(index)
@@ -635,28 +396,17 @@ private fun getPredictionFromPlugin(contextText: String) {
                                     voiceRecognizedText = ""
                                 )
                                 if (enabled) {
-                                    performVibration()
+                                    feedbackManager.performVibration()
                                     isTrackingVoiceButtons = true
-                                    // 记录录音开始前的文本
-                                    textBeforeVoiceInput = currentInputConnection?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
-                                    textLengthBeforeVoiceInput = textBeforeVoiceInput.length
-                                    Log.d("VoiceButtons", "Saved text before voice: length=$textLengthBeforeVoiceInput")
-                                    // 空格键长按触发，立即开始录音
-                                    if (::speechRecognitionManager.isInitialized) {
-                                        Log.d("VoiceButtons", "Starting speech recognition from onVoiceModeChange")
-                                        val started = speechRecognitionManager.startRecognition()
-                                        voiceRecordingStarted = started
-                                        Log.d("VoiceButtons", "Speech recognition started: $started")
-                                        if (!started) {
-                                            Log.e(TAG, "Failed to start speech recognition")
-                                            uiState.value = uiState.value.copy(
-                                                isVoiceMode = false,
-                                                voiceRecognitionState = RecognitionState.ERROR
-                                            )
-                                            isTrackingVoiceButtons = false
-                                        }
-                                    } else {
-                                        Log.e(TAG, "speechRecognitionManager not initialized")
+                                    val started = voiceRecognitionHandler.startRecognition()
+                                    voiceRecordingStarted = started
+                                    Log.d("VoiceButtons", "Speech recognition started: $started")
+                                    if (!started) {
+                                        Log.e(TAG, "Failed to start speech recognition")
+                                        uiState.value = uiState.value.copy(
+                                            isVoiceMode = false,
+                                            voiceRecognitionState = RecognitionState.ERROR
+                                        )
                                         isTrackingVoiceButtons = false
                                     }
                                 } else {
@@ -674,164 +424,15 @@ private fun getPredictionFromPlugin(contextText: String) {
         return container
     }
     
-    /**
-     * 自定义容器 View，在 View 层级处理触摸事件
-     * 这样切换界面不会中断手势监听
-     */
-    private inner class VoiceKeyboardContainer(context: android.content.Context) : FrameLayout(context) {
-        private var isLongPressWaiting = false
-        private var isPressing = false
-        private var lastLeftActive = false
-        private var lastRightActive = false
-        
-        override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-            ev?.let {
-                when (it.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        val isVoiceMode = uiState.value.isVoiceMode
-                        Log.d("VoiceButtons", "DOWN: isVoiceMode=$isVoiceMode, x=${it.x}, y=${it.y}")
-                        
-                        lastLeftActive = false
-                        lastRightActive = false
-                        
-                        if (isVoiceMode) {
-                            // 语音键盘已激活，检测底部区域按压
-                            val yThreshold = height * 0.6f
-                            
-                            if (it.y > yThreshold) {
-                                isTrackingVoiceButtons = true
-                                uiState.value = uiState.value.copy(
-                                    voiceButtonState = VoiceButtonState(bottomActive = true)
-                                )
-                                Log.d("VoiceButtons", "Pressed bottom area in voice mode")
-                            }
-                        }
-                        // 普通键盘的空格键长按由 KeyboardLayout 处理
-                    }
-                    
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        Log.d("VoiceButtons", "UP: isVoiceMode=${uiState.value.isVoiceMode}, voiceRecordingStarted=$voiceRecordingStarted, leftActive=${uiState.value.voiceButtonState.leftActive}, rightActive=${uiState.value.voiceButtonState.rightActive}")
-                        
-                        val state = uiState.value.voiceButtonState
-                        
-                        // 处理按钮操作（即使录音未开始也处理）
-                        if (state.leftActive) {
-                            Log.d("VoiceButtons", "Performing undo")
-                            performUndo()
-                        } else if (state.rightActive) {
-                            Log.d("VoiceButtons", "Performing search")
-                            performSearch()
-                        }
-                        
-                        // 如果正在录音，停止录音
-                        if (voiceRecordingStarted && ::speechRecognitionManager.isInitialized) {
-                            Log.d("VoiceButtons", "Stopping recording")
-                            speechRecognitionManager.stopRecognition()
-                            voiceRecordingStarted = false
-                        }
-                        
-                        // 退出语音模式
-                        if (uiState.value.isVoiceMode) {
-                            uiState.value = uiState.value.copy(
-                                isVoiceMode = false,
-                                voiceButtonState = VoiceButtonState(),
-                                voiceRecognitionState = RecognitionState.IDLE
-                            )
-                        }
-                        
-                        isTrackingVoiceButtons = false
-                        lastLeftActive = false
-                        lastRightActive = false
-                    }
-                    
-                    MotionEvent.ACTION_MOVE -> {
-                        val isVoiceMode = uiState.value.isVoiceMode
-                        
-                        if (isVoiceMode && isTrackingVoiceButtons) {
-                            val yThreshold = height * 0.6f
-                            
-                            // 左按钮区域：屏幕左侧 25%
-                            val leftButtonEnd = width * 0.25f
-                            // 右按钮区域：屏幕右侧 25%
-                            val rightButtonStart = width * 0.75f
-                            
-                            Log.d("VoiceButtons", "MOVE: x=${it.x}, y=${it.y}, leftEnd=$leftButtonEnd, rightStart=$rightButtonStart, yThreshold=$yThreshold")
-                            
-                            if (it.y > yThreshold) {
-                                // 底部区域
-                                if (it.x < leftButtonEnd) {
-                                    // 左按钮
-                                    if (!lastLeftActive) {
-                                        performVibration()
-                                        lastLeftActive = true
-                                    }
-                                    uiState.value = uiState.value.copy(
-                                        voiceButtonState = VoiceButtonState(leftActive = true)
-                                    )
-                                } else if (it.x > rightButtonStart) {
-                                    // 右按钮
-                                    if (!lastRightActive) {
-                                        performVibration()
-                                        lastRightActive = true
-                                    }
-                                    uiState.value = uiState.value.copy(
-                                        voiceButtonState = VoiceButtonState(rightActive = true)
-                                    )
-                                } else {
-                                    // 中间底部 - 继续录音
-                                    lastLeftActive = false
-                                    lastRightActive = false
-                                    uiState.value = uiState.value.copy(
-                                        voiceButtonState = VoiceButtonState(bottomActive = true)
-                                    )
-                                }
-                            } else if (it.x < leftButtonEnd) {
-                                // 左按钮（上方区域也触发）
-                                if (!lastLeftActive) {
-                                    performVibration()
-                                    lastLeftActive = true
-                                }
-                                uiState.value = uiState.value.copy(
-                                    voiceButtonState = VoiceButtonState(leftActive = true)
-                                )
-                            } else if (it.x > rightButtonStart) {
-                                // 右按钮（上方区域也触发）
-                                if (!lastRightActive) {
-                                    performVibration()
-                                    lastRightActive = true
-                                }
-                                uiState.value = uiState.value.copy(
-                                    voiceButtonState = VoiceButtonState(rightActive = true)
-                                )
-                            } else {
-                                // 中间区域 - 无按钮激活
-                                lastLeftActive = false
-                                lastRightActive = false
-                                uiState.value = uiState.value.copy(
-                                    voiceButtonState = VoiceButtonState()
-                                )
-                            }
-                            
-                            Log.d("VoiceButtons", "MOVE result: bottom=${uiState.value.voiceButtonState.bottomActive}, left=${uiState.value.voiceButtonState.leftActive}, right=${uiState.value.voiceButtonState.rightActive}")
-                        }
-                    }
-                }
-            }
-            return super.dispatchTouchEvent(ev)
-        }
-    }
-    
     private fun performUndo() {
-        // 撤回操作：删除本次语音输入的所有文本
         val currentTextBeforeCursor = currentInputConnection?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
         val currentLength = currentTextBeforeCursor.length
         
-        val charsToDelete = currentLength - textLengthBeforeVoiceInput
+        val charsToDelete = currentLength - voiceRecognitionHandler.textLengthBeforeVoiceInput
         
-        Log.d("VoiceButtons", "Undo: currentLength=$currentLength, savedLength=$textLengthBeforeVoiceInput, charsToDelete=$charsToDelete")
+        Log.d("VoiceButtons", "Undo: currentLength=$currentLength, savedLength=${voiceRecognitionHandler.textLengthBeforeVoiceInput}, charsToDelete=$charsToDelete")
         
         if (charsToDelete > 0) {
-            // 删除本次语音输入的所有文本
             for (i in 0 until charsToDelete) {
                 currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
                 currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
@@ -841,13 +442,11 @@ private fun getPredictionFromPlugin(contextText: String) {
             Log.d("VoiceButtons", "No characters to delete")
         }
         
-        // 重置保存的文本
-        textBeforeVoiceInput = ""
-        textLengthBeforeVoiceInput = 0
+        voiceRecognitionHandler.textBeforeVoiceInput = ""
+        voiceRecognitionHandler.textLengthBeforeVoiceInput = 0
     }
     
     private fun performSearch() {
-        // 搜索操作：发送 Enter 键
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
     }
@@ -857,14 +456,11 @@ private fun getPredictionFromPlugin(contextText: String) {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         loadDarkModePreference()
         
-        // 清空上屏文本（新的输入开始）
-        lastCommittedText = ""
+        predictionManager.lastCommittedText = ""
         Log.d(TAG, "onStartInput: cleared lastCommittedText")
         
-        // 动态检查联想功能设置（允许运行时开启，无需重启）
         checkAndInitializeAssociationEngine()
         
-        // 更新 Enter 键文字
         attribute?.let { updateEnterKeyText(it) }
     }
     
@@ -908,84 +504,53 @@ private fun getPredictionFromPlugin(contextText: String) {
             SettingsPreferences.getPrefsPublic(this).unregisterOnSharedPreferenceChangeListener(it)
         }
         rimeEngine.destroy()
-        if (::speechRecognitionManager.isInitialized) {
-            speechRecognitionManager.release()
-        }
+        voiceRecognitionHandler.release()
         ExtensionManager.release()
         serviceScope.cancel()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
     }
     
-    /**
-     * 收起键盘
-     */
     private fun hideKeyboard() {
         requestHideSelf(0)
     }
     
-/**
-      * 更新 UI 状态 - 合并所有状态更新，减少Compose重组次数
-      * 联想预测只使用已上屏的文本(lastCommittedText)
-      */
- private fun updateUI() {
-     val inputText = rimeEngine.getInput()
-     val candidatesWithComments = rimeEngine.getCandidatesWithComments()
-     
-uiState.value = uiState.value.copy(
-          inputText = inputText,
-          candidates = candidatesWithComments.map { it.text }.toTypedArray(),
-          candidateComments = candidatesWithComments.map { it.comment }.toTypedArray(),
-          isComposing = inputText.isNotEmpty(),
-          isAsciiMode = rimeEngine.isAsciiMode(),
-          associationCandidates = emptyArray()
-      )
-      
-      val pendingEnglish = uiState.value.pendingEnglishText
-      
-      if (pendingEnglish.isNotEmpty()) {
-          serviceScope.launch {
-              try {
-                  val candidates = AssociationService.getAssociations(
-                      this@KimeInputMethodService,
-                      pendingEnglish,
-                      true,
-                      5
-                  )
-                  
-                  Log.d(TAG, "English association for pending '$pendingEnglish': ${candidates.joinToString()}")
-                  withContext(Dispatchers.Main) {
-                      uiState.value = uiState.value.copy(associationCandidates = candidates.toTypedArray())
-                  }
-              } catch (e: Exception) {
-                  Log.e(TAG, "English association failed", e)
-              }
-          }
-      } else if (SettingsPreferences.isSmartPredictionEnabled(this) && inputText.isEmpty() && lastCommittedText.isNotEmpty()) {
-          val isAscii = rimeEngine.isAsciiMode()
-          if (!isAscii) {
-              serviceScope.launch {
-                  try {
-                      if (!AssociationManager.isInitialized()) {
-                          Log.d(TAG, "AssociationManager not initialized, initializing...")
-                          AssociationManager.initialize(this@KimeInputMethodService)
-                      }
-                      
-                      Log.d(TAG, "Chinese association for '$lastCommittedText'")
-                      
-                      val candidates = AssociationManager.predict(lastCommittedText, 5)
-                      
-                      Log.d(TAG, "Chinese association candidates: ${candidates.map { it.text }}")
-                      withContext(Dispatchers.Main) {
-                          uiState.value = uiState.value.copy(associationCandidates = candidates.map { it.text }.toTypedArray())
-                      }
-                  } catch (e: Exception) {
-                      Log.e(TAG, "Chinese association failed", e)
-                  }
-              }
-          }
-      }
-  }
+    private fun updateUI() {
+        val inputText = rimeEngine.getInput()
+        val candidatesWithComments = rimeEngine.getCandidatesWithComments()
+        
+        uiState.value = uiState.value.copy(
+            inputText = inputText,
+            candidates = candidatesWithComments.map { it.text }.toTypedArray(),
+            candidateComments = candidatesWithComments.map { it.comment }.toTypedArray(),
+            isComposing = inputText.isNotEmpty(),
+            isAsciiMode = rimeEngine.isAsciiMode(),
+            associationCandidates = emptyArray()
+        )
+        
+        val pendingEnglish = uiState.value.pendingEnglishText
+        
+        if (pendingEnglish.isNotEmpty()) {
+            serviceScope.launch {
+                val candidates = predictionManager.getEnglishAssociations(pendingEnglish, 5)
+                Log.d(TAG, "English association for pending '$pendingEnglish': ${candidates.joinToString()}")
+                withContext(Dispatchers.Main) {
+                    uiState.value = uiState.value.copy(associationCandidates = candidates)
+                }
+            }
+        } else if (SettingsPreferences.isSmartPredictionEnabled(this) && inputText.isEmpty() && predictionManager.lastCommittedText.isNotEmpty()) {
+            val isAscii = rimeEngine.isAsciiMode()
+            if (!isAscii) {
+                serviceScope.launch {
+                    val candidates = predictionManager.getChineseAssociations(predictionManager.lastCommittedText, 5)
+                    Log.d(TAG, "Chinese association candidates: ${candidates.joinToString()}")
+                    withContext(Dispatchers.Main) {
+                        uiState.value = uiState.value.copy(associationCandidates = candidates)
+                    }
+                }
+            }
+        }
+    }
     
     private fun updateSchemaName() {
         val currentSchemaId = rimeEngine.getCurrentSchema()
@@ -1029,9 +594,9 @@ uiState.value = uiState.value.copy(
                         
                         needsUIUpdate = true
                     } else {
-                        if (lastCommittedText.isNotEmpty()) {
-                            lastCommittedText = lastCommittedText.dropLast(1)
-                            Log.d(TAG, "Delete committed text, remaining: '$lastCommittedText'")
+                        if (predictionManager.lastCommittedText.isNotEmpty()) {
+                            predictionManager.lastCommittedText = predictionManager.lastCommittedText.dropLast(1)
+                            Log.d(TAG, "Delete committed text, remaining: '${predictionManager.lastCommittedText}'")
                         }
                         
                         uiState.value = uiState.value.copy(
@@ -1223,11 +788,10 @@ uiState.value = uiState.value.copy(
         if (rimeEngine.selectCandidate(index)) {
             val committedText = rimeEngine.commit()
             if (committedText.isNotEmpty()) {
-                // 学习用户输入
-                if (SettingsPreferences.isSmartPredictionEnabled(this@KimeInputMethodService) && selectedCandidate != null && AssociationManager.isInitialized()) {
-                    if (lastCommittedText.isNotEmpty()) {
-                        val lastChar = lastCommittedText.last().toString()
-                        AssociationManager.recordInput(lastChar + selectedCandidate)
+                if (SettingsPreferences.isSmartPredictionEnabled(this) && selectedCandidate != null && AssociationManager.isInitialized()) {
+                    if (predictionManager.lastCommittedText.isNotEmpty()) {
+                        val lastChar = predictionManager.lastCommittedText.last().toString()
+                        predictionManager.recordInputPair(lastChar, selectedCandidate)
                         Log.d(TAG, "Learned: '$lastChar' + '$selectedCandidate'")
                     }
                 }
@@ -1247,22 +811,15 @@ uiState.value = uiState.value.copy(
         }
     }
     
-    /**
-     * 切换输入法模式（中文/英文）
-     */
     private fun switchInputMethod() {
         Log.d(TAG, "Toggling ascii mode")
         rimeEngine.toggleAsciiMode()
         updateUI()
     }
     
-    /**
-     * 部署方案
-     */
     private fun reloadConfig() {
         Log.d(TAG, "Deploying schema...")
         
-        // 收起键盘并显示提示
         mainHandler.post {
             requestHideSelf(0)
             android.widget.Toast.makeText(this, "方案部署中...", android.widget.Toast.LENGTH_SHORT).show()
@@ -1274,30 +831,25 @@ uiState.value = uiState.value.copy(
                 
                 val userDataDir = File(filesDir, "rime/user")
                 
-                // 删除旧的 default.custom.yaml（避免覆盖 assets 中的 schema_list）
                 val customFile = File(userDataDir, "default.custom.yaml")
                 if (customFile.exists()) {
                     Log.d(TAG, "Removing old default.custom.yaml")
                     customFile.delete()
                 }
                 
-                // 清理 build 目录强制重新部署
                 val buildDir = File(userDataDir, "build")
                 if (buildDir.exists()) {
                     Log.d(TAG, "Cleaning build directory")
                     buildDir.deleteRecursively()
                 }
                 
-                // 部署
                 Log.d(TAG, "Starting deployment...")
                 val deployResult = rimeEngine.deploy()
                 Log.d(TAG, "Deploy result: $deployResult")
                 
-                // 获取可用方案列表
                 val availableSchemas = rimeEngine.getAvailableSchemas()
                 Log.d(TAG, "Available schemas: ${availableSchemas.joinToString()}")
                 
-                // 切换到保存的方案
                 val savedSchema = SettingsPreferences.getCurrentSchema(this)
                 Log.d(TAG, "Saved schema: $savedSchema")
                 if (savedSchema in availableSchemas) {
@@ -1307,7 +859,6 @@ uiState.value = uiState.value.copy(
                     Log.w(TAG, "Schema $savedSchema not found in available schemas")
                 }
                 
-                // 在主线程更新 UI
                 mainHandler.post {
                     updateSchemaName()
                     updateUI()
@@ -1320,9 +871,6 @@ uiState.value = uiState.value.copy(
         }.start()
     }
     
-    /**
-     * 部署方案
-     */
     private fun deploySchema() {
         Log.d(TAG, "Deploying schema...")
         try {
@@ -1336,9 +884,6 @@ uiState.value = uiState.value.copy(
         }
     }
     
-    /**
-     * 打开输入法设置
-     */
     private fun openSettings() {
         Log.d(TAG, "Opening settings...")
         try {
@@ -1376,16 +921,12 @@ uiState.value = uiState.value.copy(
         }
     }
 
-private fun commitText(text: String) {
+    private fun commitText(text: String) {
         currentInputConnection?.commitText(text, 1)
-        lastCommittedText = text
+        predictionManager.lastCommittedText = text
         
-        // 学习用户输入
-        if (SettingsPreferences.isSmartPredictionEnabled(this) && AssociationManager.isInitialized()) {
-            AssociationManager.recordInput(text)
-        }
+        predictionManager.recordInput(text)
         
-        // 获取联想词
         getPredictionFromPlugin(text)
     }
     
@@ -1435,9 +976,6 @@ private fun commitText(text: String) {
         }
     }
     
-    /**
-     * 选择剪切板项
-     */
     private fun selectClipboardItem(text: String) {
         if (uiState.value.isComposing) {
             rimeEngine.clearComposition()
@@ -1447,37 +985,22 @@ private fun commitText(text: String) {
         clipboardManager.copyToSystemClipboard(text)
     }
     
-    /**
-     * 删除剪切板项
-     */
     private fun removeClipboardItem(id: Long) {
         clipboardManager.removeItem(id)
     }
     
-    /**
-     * 切换剪切板项置顶状态
-     */
     private fun toggleClipboardPin(id: Long) {
         clipboardManager.togglePin(id)
     }
     
-    /**
-     * 清空剪切板
-     */
     private fun clearClipboard() {
         clipboardManager.clearAll()
     }
     
-    /**
-     * 添加到快捷发送
-     */
     private fun addToQuickSend(id: Long) {
         clipboardManager.addToQuickSend(id)
     }
     
-    /**
-     * 从快捷发送移除
-     */
     private fun removeFromQuickSend(id: Long) {
         clipboardManager.removeFromQuickSend(id)
     }
