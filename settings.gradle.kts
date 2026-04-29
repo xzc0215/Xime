@@ -1,5 +1,12 @@
 pluginManagement {
     repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
         maven {
             url = uri("https://maven.aliyun.com/repository/public/")
         }
@@ -8,16 +15,6 @@ pluginManagement {
         }
         maven {
             url = uri("https://maven.aliyun.com/repository/central")
-        }
-        maven {
-            url = uri("https://maven.aliyun.com/repository/apache-snapshots")
-        }
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
         }
         mavenCentral()
         gradlePluginPortal()
