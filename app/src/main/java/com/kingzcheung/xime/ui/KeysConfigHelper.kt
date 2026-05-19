@@ -3,10 +3,8 @@ package com.kingzcheung.xime.ui
 import android.content.Context
 import android.util.Log
 import com.charleskorn.kaml.Yaml
-import com.charleskorn.kaml.YamlConfiguration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.decodeFromString
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -32,14 +30,6 @@ data class HotkeysConfig(
     val showAllKeys: String? = null
 )
 
-@Serializable
-data class KeysConfigFile(
-    @SerialName("swipe_up")
-    val swipeUp: Map<String, String> = emptyMap(),
-    @SerialName("swipe_down_english")
-    val swipeDownEnglish: Map<String, String> = emptyMap()
-)
-
 data class KeysConfig(
     val swipeUp: Map<String, String> = emptyMap(),
     val swipeDownEnglish: Map<String, String> = emptyMap(),
@@ -48,7 +38,6 @@ data class KeysConfig(
 
 object KeysConfigHelper {
     private const val TAG = "KeysConfigHelper"
-    private const val KEYS_CONFIG_FILE = "kime.keys.yaml"
     private const val XIME_CONFIG_FILE = "xime.yaml"
     
     private val yaml = Yaml.default
@@ -56,32 +45,12 @@ object KeysConfigHelper {
     private var config: KeysConfig = KeysConfig()
     
     fun loadConfig(context: Context): KeysConfig {
-        loadKeysConfig(context)
         loadXimeConfig(context)
+        config = config.copy(
+            swipeUp = getDefaultSwipeUp(),
+            swipeDownEnglish = getDefaultSwipeDownEnglish()
+        )
         return config
-    }
-    
-    private fun loadKeysConfig(context: Context) {
-        try {
-            val inputStream = context.assets.open(KEYS_CONFIG_FILE)
-            val reader = BufferedReader(InputStreamReader(inputStream))
-            val content = reader.readText()
-            reader.close()
-            inputStream.close()
-            
-            val keysConfigFile = yaml.decodeFromString<KeysConfigFile>(content)
-            config = config.copy(
-                swipeUp = keysConfigFile.swipeUp,
-                swipeDownEnglish = keysConfigFile.swipeDownEnglish
-            )
-            Log.d(TAG, "Loaded keys config from $KEYS_CONFIG_FILE")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to load $KEYS_CONFIG_FILE, using default config: ${e.message}")
-            config = config.copy(
-                swipeUp = getDefaultSwipeUp(),
-                swipeDownEnglish = getDefaultSwipeDownEnglish()
-            )
-        }
     }
     
     private fun loadXimeConfig(context: Context) {
@@ -92,7 +61,7 @@ object KeysConfigHelper {
             reader.close()
             inputStream.close()
             
-            val ximeConfig = yaml.decodeFromString<XimeConfig>(content)
+            val ximeConfig = yaml.decodeFromString(XimeConfig.serializer(), content)
             val schemaRadicals = ximeConfig.wubiRadicals?.schemaRadicals ?: emptyMap()
             config = config.copy(schemaRadicals = schemaRadicals)
             Log.d(TAG, "Loaded schema radicals from $XIME_CONFIG_FILE: ${schemaRadicals.keys}")

@@ -68,8 +68,7 @@ abc_segmentor:
 
 reverse_lookup:
   dictionary: pinyin_simp
-  enable_completion: true
-  overwrite_comment: false
+  # overwrite_comment: false
   tips: "〔拼音〕"
   preedit_format:
     - xform/([nl])v/$1ü/

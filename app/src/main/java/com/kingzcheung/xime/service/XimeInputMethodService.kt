@@ -615,6 +615,19 @@ if (state.showKeyboardResize) {
         Log.d(TAG, "onStartInput: cleared lastCommittedText")
 
         checkAndInitializeAssociationEngine()
+        
+        if (RimeEngine.isInitialized()) {
+            val savedSchema = SettingsPreferences.getCurrentSchema(this)
+            val currentSchema = rimeEngine.getCurrentSchema()
+            if (savedSchema != currentSchema) {
+                Log.d(TAG, "onStartInput: schema mismatch, saved=$savedSchema, current=$currentSchema")
+                val availableSchemas = rimeEngine.getAvailableSchemas()
+                if (savedSchema in availableSchemas) {
+                    rimeEngine.switchSchema(savedSchema)
+                    updateSchemaName()
+                }
+            }
+        }
 
         // 获取最近30秒的剪切板内容
         ensureClipboardManagerInitialized()
