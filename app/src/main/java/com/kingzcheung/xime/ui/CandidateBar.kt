@@ -133,7 +133,7 @@ fun CandidateBar(
         modifier = modifier
             .padding(vertical = 0.dp)
             .fillMaxWidth()
-            .height(46.dp)
+            .height(50.dp)
             .background(backgroundColor)
             .padding(horizontal = 8.dp)
     ) {
@@ -146,7 +146,7 @@ fun CandidateBar(
                 modifier = Modifier
                     .padding(vertical = 0.dp)
                     .fillMaxWidth()
-                    .height(18.dp),
+                    .height(20.dp),
                 contentAlignment = Alignment.TopStart
             ) {
                 Text(
@@ -358,13 +358,6 @@ fun CandidateBar(
                 
 
                 if (showCandidatePage) {
-                    // 分割线
-                    Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(28.dp)
-                        .background(dividerColor)
-                    )
                     Box(
                         modifier = Modifier
                             .size(28.dp)
@@ -386,7 +379,13 @@ fun CandidateBar(
                         val isMorePressed by moreInteractionSource.collectIsPressedAsState()
 
                         Spacer(modifier = Modifier.width(4.dp))
-
+                        // 分割线
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(28.dp)
+                                .background(dividerColor).padding(end = 1.dp)
+                        )
                         Box(
                             modifier = Modifier
                                 .width(30.dp)
@@ -440,7 +439,7 @@ fun CandidateBar(
                                 imageVector = Icons.Default.KeyboardArrowDown,
                                 contentDescription = "收起键盘",
                                 tint = if (isHideKeyboardPressed) textColor.copy(alpha = 0.6f) else textColor,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -479,7 +478,7 @@ fun CandidateItem(
         Text(
             text = text,
             color = if (isSelected) accentColor else textColor,
-            fontSize = 15.sp,
+            fontSize = 16.sp,
             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1
         )
