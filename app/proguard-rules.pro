@@ -34,4 +34,7 @@
 
 -keepattributes SourceFile,LineNumberTable
 
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+
 -processkotlinnullchecks remove
