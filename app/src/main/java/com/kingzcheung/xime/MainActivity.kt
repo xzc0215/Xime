@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowInsetsControllerCompat
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.settings.SchemaManager
@@ -93,6 +96,19 @@ class MainActivity : ComponentActivity() {
             var keyboardTheme by remember { mutableStateOf(SettingsPreferences.getKeyboardTheme(context)) }
             
             XimeTheme(darkTheme = darkMode == 1, themeId = keyboardTheme) {
+                // 同步状态栏外观与应用主题，而非系统主题
+                val view = LocalView.current
+                if (!view.isInEditMode) {
+                    DisposableEffect(darkMode) {
+                        val window = (view.context as? ComponentActivity)?.window
+                        if (window != null) {
+                            val controller = WindowInsetsControllerCompat(window, view)
+                            controller.isAppearanceLightStatusBars = darkMode == 0
+                        }
+                        onDispose { }
+                    }
+                }
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Surface(
                         modifier = Modifier
