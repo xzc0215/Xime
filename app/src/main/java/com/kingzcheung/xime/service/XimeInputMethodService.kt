@@ -495,6 +495,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             onClipboardSelect = { text ->
                                 selectClipboardItem(text)
                             },
+                            onCommitText = { text ->
+                                commitClipboardText(text)
+                            },
+                            onDeleteText = { count ->
+                                deleteClipboardChars(count)
+                            },
                             onClipboardRemove = { id ->
                                 removeClipboardItem(id)
                             },
@@ -503,6 +509,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             },
                             onAddToQuickSend = { id ->
                                 addToQuickSend(id)
+                            },
+                            onAddQuickSendText = { text ->
+                                clipboardManager.addQuickSendItem(text)
                             },
                             onRemoveFromQuickSend = { id ->
                                 removeFromQuickSend(id)
@@ -1576,6 +1585,14 @@ onVoiceModeChange = { enabled ->
         }
         commitText(text)
         clipboardManager.copyToSystemClipboard(text)
+    }
+
+    private fun commitClipboardText(text: String) {
+        commitText(text)
+    }
+
+    private fun deleteClipboardChars(count: Int) {
+        currentInputConnection?.deleteSurroundingText(count, 0)
     }
     
     private fun removeClipboardItem(id: Long) {

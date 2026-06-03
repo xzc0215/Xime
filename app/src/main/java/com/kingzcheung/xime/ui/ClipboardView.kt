@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.clipboard.ClipboardItem
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
@@ -61,16 +62,17 @@ fun ClipboardView(
     onSelectItem: (String) -> Unit,
     onRemoveItem: (Long) -> Unit,
     onAddToQuickSend: (Long) -> Unit,
-    onSplitWords: (Long) -> Unit,
+    onSplitWords: (String, Long) -> Unit,
     onRemoveFromQuickSend: (Long) -> Unit,
     onBack: (() -> Unit)? = null,
     onClipboardTabChange: ((Int) -> Unit)? = null,
+    bottomPaddingDp: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    val itemBgColor = if (isDarkTheme) Color(0xFF45474A) else Color.White
-    val textColor = if (isDarkTheme) Color(0xFFE8EAED) else Color(0xFF202124)
-    val subTextColor = if (isDarkTheme) Color(0xFF9AA0A6) else Color(0xFF5F6368)
-    val accentColor = if (isDarkTheme) Color(0xFF8AB4F8) else Color(0xFF1A73E8)
+    val itemBgColor = MaterialTheme.colorScheme.surfaceContainerLow
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val subTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val accentColor = MaterialTheme.colorScheme.primary
     val configuration = LocalConfiguration.current
     val isLandscape =
         configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -177,6 +179,9 @@ fun ClipboardView(
                 onRemove = onRemoveFromQuickSend
             )
         }
+
+        // 底部留空（竖屏至少 40dp）
+        Spacer(modifier = Modifier.height(if (isLandscape) 15.dp else max(bottomPaddingDp, 40).dp))
     }
 }
 
@@ -190,7 +195,7 @@ fun ClipboardTabContent(
     onSelect: (String) -> Unit,
     onRemove: (Long) -> Unit,
     onAddToQuickSend: (Long) -> Unit,
-    onSplitWords: (Long) -> Unit
+    onSplitWords: (String, Long) -> Unit
 ) {
     if (items.isEmpty()) {
         Box(
@@ -207,7 +212,7 @@ fun ClipboardTabContent(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 4.dp, vertical = 2.dp),
+                .padding(horizontal = 10.dp, vertical = 2.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             items(items, key = { it.id }) { item ->
@@ -220,7 +225,7 @@ fun ClipboardTabContent(
                     onSelect = { onSelect(item.text) },
                     onRemove = { onRemove(item.id) },
                     onAddToQuickSend = { onAddToQuickSend(item.id) },
-                    onSplitWords = { onSplitWords(item.id) }
+                    onSplitWords = { onSplitWords(item.text, item.id) }
                 )
             }
         }
@@ -434,8 +439,8 @@ fun CompactQuickSendItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(36.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .height(40.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
             .clickable { onSelect() },
         verticalAlignment = Alignment.CenterVertically

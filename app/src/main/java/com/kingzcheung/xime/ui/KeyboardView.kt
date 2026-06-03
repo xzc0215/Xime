@@ -57,6 +57,7 @@ import com.kingzcheung.xime.ui.theme.KeyTextColorDark
 import com.kingzcheung.xime.ui.theme.KeyboardBackground
 import com.kingzcheung.xime.ui.theme.KeyboardBackgroundDark
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
+import com.kingzcheung.xime.ui.SplitWordsView
 
 val LocalStretchFactor = compositionLocalOf { 1f }
 
@@ -91,9 +92,12 @@ fun KeyboardView(
     onToggleDarkMode: (() -> Unit)? = null,
     onClipboard: (() -> Unit)? = null,
     onClipboardSelect: ((String) -> Unit)? = null,
+    onCommitText: ((String) -> Unit)? = null,
+    onDeleteText: ((Int) -> Unit)? = null,
     onClipboardRemove: ((Long) -> Unit)? = null,
     onClipboardSplitWords: ((Long) -> Unit)? = null,
     onAddToQuickSend: ((Long) -> Unit)? = null,
+    onAddQuickSendText: ((String) -> Unit)? = null,
     onRemoveFromQuickSend: ((Long) -> Unit)? = null,
     onQuickSend: (() -> Unit)? = null,
     onKeyboardResize: (() -> Unit)? = null,
@@ -166,6 +170,7 @@ fun KeyboardView(
                         is KeyboardRoute.CandidatePage -> KeyboardRoute.Keyboard
                         is KeyboardRoute.ToolbarCustomize -> KeyboardRoute.Keyboard
                         is KeyboardRoute.Emoji -> KeyboardRoute.Keyboard
+                        is KeyboardRoute.SplitWords -> KeyboardRoute.Keyboard
                         else -> KeyboardRoute.Keyboard
                     }
                 },
@@ -471,10 +476,11 @@ fun KeyboardView(
                     },
                     onRemoveItem = { id -> onClipboardRemove?.invoke(id) },
                     onAddToQuickSend = { id -> onAddToQuickSend?.invoke(id) },
-                    onSplitWords = { id -> onClipboardSplitWords?.invoke(id) },
+                    onSplitWords = { text, _ -> currentRoute = KeyboardRoute.SplitWords(text) },
                     onRemoveFromQuickSend = { id -> onRemoveFromQuickSend?.invoke(id) },
                     onBack = { currentRoute = KeyboardRoute.Keyboard },
                     onClipboardTabChange = { currentRoute = KeyboardRoute.Clipboard(it) },
+                    bottomPaddingDp = keyboardBottomPaddingDp,
                     modifier = Modifier.fillMaxWidth().fillMaxHeight()
                 )
                 is KeyboardRoute.SchemaList -> SchemaListView(
@@ -520,6 +526,17 @@ fun KeyboardView(
                     onPageDown = onPageDown,
                     onPageUp = onPageUp,
                     onBack = { currentRoute = KeyboardRoute.Keyboard },
+                    bottomPaddingDp = keyboardBottomPaddingDp,
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                )
+                is KeyboardRoute.SplitWords -> SplitWordsView(
+                    text = (currentRoute as KeyboardRoute.SplitWords).text,
+                    backgroundColor = keyboardBgColor,
+                    onBack = { currentRoute = KeyboardRoute.Clipboard(clipboardTab) },
+                    onAddQuickSendText = { text -> onAddQuickSendText?.invoke(text) },
+                    onNavigateToQuickSend = { currentRoute = KeyboardRoute.Clipboard(1) },
+                    onSelectChar = { char -> onCommitText?.invoke(char) },
+                    onDeleteText = { count -> onDeleteText?.invoke(count) },
                     bottomPaddingDp = keyboardBottomPaddingDp,
                     modifier = Modifier.fillMaxWidth().fillMaxHeight()
                 )
