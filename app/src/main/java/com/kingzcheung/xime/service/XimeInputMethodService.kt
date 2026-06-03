@@ -258,7 +258,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (needsDeployment) {
                     // 首次部署：需要完整编译词库
                     notifyDeploymentStatus(true, "正在编译词库...")
-                    val maintenanceStarted = rimeEngine.startMaintenance(true)
+
+                    // 如果所有方案已编译完成，只是 deploymentDone 标记没设（例如从设置页部署的），
+                    // 用增量刷新即可，避免不必要的全量扫描
+                    val alreadyCompiled = RimeConfigHelper.isDeploymentComplete(this@XimeInputMethodService)
+                    val maintenanceStarted = rimeEngine.startMaintenance(!alreadyCompiled)
                     if (!maintenanceStarted) {
                         Log.w(TAG, "initRimeEngine: startMaintenance returned false! " +
                                 "Deployment may not have started. Trying deploy() as fallback...")
@@ -290,11 +294,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             Log.w(TAG, "initRimeEngine: maintenance still running after timeout, continuing anyway")
                         } else {
                             Log.d(TAG, "initRimeEngine: maintenance completed in ${maintenanceWaited}ms")
+                            rimeEngine.updateLastBuildTime()
                         }
                     }
                 } else {
                     // 词库已存在：快速刷新 schema 注册表，不显示"编译"提示
                     rimeEngine.startMaintenance(false)
+                    // 等待 maintenance 完成（最多等 10 秒），否则 ensureSession 会因为
+                    // maintenance 还在运行而创建 session 失败
+                    var quickWaited = 0L
+                    while (rimeEngine.isMaintaining() && quickWaited < 10_000L) {
+                        Thread.sleep(100)
+                        quickWaited += 100
+                    }
+                    if (!rimeEngine.isMaintaining()) {
+                        rimeEngine.updateLastBuildTime()
+                    }
                 }
 
                 val sessionReady = rimeEngine.ensureSession()
