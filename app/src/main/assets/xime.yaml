@@ -16,10 +16,6 @@ xime_index:
     - "https://raw.githubusercontent.com/ximeiorg/xime-index/refs/heads/main/"
 
 style:
-  font_size: 14 # 手机端无效
-  candidate_count: 5 # 手机端无效
-  show_code_hint: true # 手机端无效
-  horizontal: true # 手机端无效
   color_scheme: lavender_purple
 
 color_schemes:
