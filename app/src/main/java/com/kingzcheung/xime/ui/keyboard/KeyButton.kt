@@ -131,8 +131,7 @@ fun KeyButton(
                         hasTriggeredSwipeDown = false
                         isSwiping = false
                         isSwipeDown = false
-                        onSwipeStateChange?.invoke(SwipeState(false, null, false))
-                        onPress?.invoke()
+                        // onSwipeStateChange/onPress 由 detectTapGestures.onPress 处理
                     },
                     onDragEnd = {
                         // onClick is handled by detectTapGestures below — do NOT fire it here
@@ -338,8 +337,7 @@ fun SwipeableKeyButton(
                         hasTriggeredSwipeDown = false
                         isSwiping = false
                         isSwipeDown = false
-                        currentOnSwipeStateChange?.invoke(SwipeState(isPressed = true, pressedText = currentText), buttonBounds)
-                        currentOnPress?.invoke()
+                        // currentOnSwipeStateChange/currentOnPress 由 detectTapGestures / awaitEachGesture 处理
                     },
                     onDragEnd = {
                         // onClick is handled by detectTapGestures / awaitEachGesture below
