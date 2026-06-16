@@ -122,13 +122,14 @@ fun rememberSwipeBubbleDrawData(
 
     val rightRoom = bodyRight - pointerRight
     val leftRoom = pointerLeft - bodyLeft
-    val isLeftFlush = leftRoom < cornerRadiusPx || kotlin.math.abs(bodyLeft - pointerLeft) < 1f
-    val isRightFlush = rightRoom < cornerRadiusPx || kotlin.math.abs(bodyRight - pointerRight) < 1f
+    val flushTolerancePx = with(density) { 10.dp.toPx() }
+    val isLeftFlush = leftRoom < cornerRadiusPx + flushTolerancePx || kotlin.math.abs(bodyLeft - pointerLeft) < 1f
+    val isRightFlush = rightRoom < cornerRadiusPx + flushTolerancePx || kotlin.math.abs(bodyRight - pointerRight) < 1f
     val bodyLeftInBox = bodyLeft - boxLeft
     val pointerLeftInBox = pointerLeft - boxLeft
     val pointerRightInBox = pointerLeftInBox + keyWidthPx
-    val pathBodyLeft = if (isLeftFlush && !isLongPressMode) pointerLeftInBox else bodyLeftInBox
-    val pathBodyWidth = (if (isRightFlush && !isLongPressMode) pointerRightInBox else (bodyLeftInBox + bodyWidth)) - pathBodyLeft
+    val pathBodyLeft = if (isLeftFlush) pointerLeftInBox else bodyLeftInBox
+    val pathBodyWidth = (if (isRightFlush) pointerRightInBox else (bodyLeftInBox + bodyWidth)) - pathBodyLeft
 
     val paddingPx = with(density) { 10.dp.toPx() }
 
