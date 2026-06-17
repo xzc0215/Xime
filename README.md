@@ -4,7 +4,7 @@
 
 <h1 align="center">Xime（曦码） - 五笔/拼音输入法</h1>
 
-[Xime 输入法 (Windows 版)](https://github.com/ximeiorg/winxime) | [Xime 输入法 (Linux 版)](https://github.com/ximeiorg/xime-wayland)
+[Xime 输入法 (Windows 版)](https://github.com/ximeiorg/winxime) | [Xime 输入法 (Linux 版)](https://github.com/ximeiorg/xime-wayland) | [联想词预测模型](https://github.com/ximeiorg/predictive-text)  | [手写输入法模型](https://github.com/ximeiorg/ochwpro) 
 
 一款基于 <a href="https://rime.im/">Rime</a> 引擎构建的 Android 五笔/拼音输入法，专注于简洁高效的中文输入体验。
 
@@ -38,8 +38,6 @@
     <td><img src="docs/Screenshot/plugin_dark.jpg" width="180"></td>
   </tr>
 </table>
-
-> 这是专门为我的个人使用习惯而开发的手机输入法，请勿用于商业用途。
 
 ## 功能特点
 
