@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asComposeRenderEffect // 導入關鍵的轉換擴展函數
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
 import kotlin.math.abs
@@ -187,12 +188,12 @@ fun KeyboardView(
             modifier = Modifier
                 .matchParentSize()
                 .graphicsLayer {
-                    // 使用底層 RenderEffect 實現高質量物理模糊，代替不穩定的 Modifier.blur
+                    // 使用底層 RenderEffect 實現高質量物理模糊，並轉換為 Compose 可識別的 RenderEffect
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                         renderEffect = android.graphics.RenderEffect.createBlurEffect(
                             60f, 60f, // 模糊半徑，數值越大毛玻璃越通透
                             android.graphics.Shader.TileMode.CLAMP
-                        )
+                        ).asComposeRenderEffect() // 修正：此處加上 .asComposeRenderEffect() 解決類型不匹配錯誤
                     }
                 }
                 .background(keyboardBgColor.copy(alpha = 0.65f)) // 半透明背景混色
