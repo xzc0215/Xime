@@ -36,8 +36,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur // 正確導入模糊擴展
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
@@ -169,28 +170,52 @@ fun KeyboardView(
         keyboardState = initialKeyboardLayoutState(isAsciiMode)
     }
 
-    // ─── 定義鍵盤頂部圓角（左上/右上 16.dp） ───
+    // ─── 完美毛玻璃外殼（解決圓角黑邊問題） ───
     val topRoundedShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .clip(topRoundedShape) // 限制整體圓角框
+            .graphicsLayer {
+                shape = topRoundedShape
+                clip = true // 在單獨渲染圖層中裁剪圓角，防止產生黑邊
+            }
     ) {
-        // 【第一層：獨立背景毛玻璃層】只做背景模糊，絕不連累文字
-        Spacer(
+        // 【第一層：獨立背景毛玻璃層】只做背景模糊，不汙染文字內容
+        Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(keyboardBgColor.copy(alpha = 0.75f)) // 半透明背景
-                .blur(20.dp) // 精準毛玻璃
+                .graphicsLayer {
+                    // 使用底層 RenderEffect 實現高質量物理模糊，代替不穩定的 Modifier.blur
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                            60f, 60f, // 模糊半徑，數值越大毛玻璃越通透
+                            android.graphics.Shader.TileMode.CLAMP
+                        )
+                    }
+                }
+                .background(keyboardBgColor.copy(alpha = 0.65f)) // 半透明背景混色
         )
 
-        // 【第二層：UI 內容層】完全清晰，不受模糊濾鏡影響
+        // 【第二層：UI 內容層】（保持完全清晰，並自帶下滑屏蔽攔截手勢）
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            val totalX = abs(dragAmount.x)
+                            val totalY = abs(dragAmount.y)
+
+                            // 核心手勢鎖定：當檢測到明顯下滑（縱向位移大於橫向 1.5 倍）
+                            if (dragAmount.y > 0 && totalY > totalX * 1.5f) {
+                                change.consume() // 消耗並攔截此手勢，防止底層觸發左右滑動衝突
+                            }
+                        }
+                    )
+                }
         ) {
             CandidateBar(
                 candidates = candidates.toList(),
@@ -216,7 +241,7 @@ fun KeyboardView(
                     ToolbarAction(button, onClick)
                 },
                 visuals = CandidateBarVisuals(
-                    backgroundColor = candidateBarBg.copy(alpha = 0.4f), // 稍微降低透明度，讓背景毛玻璃更好看
+                    backgroundColor = candidateBarBg.copy(alpha = 0.4f), // 降低透明度讓底層毛玻璃透出來
                     showClipboardHeader = candState.isShowingRecentClipboard,
                     textColor = candidateTextColor,
                     dividerColor = dividerColor,
@@ -260,7 +285,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 透明以顯現底層毛玻璃
+                        keyboardBackgroundColor = Color.Transparent, // 保持透明
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme,
                         themeId = themeId,
@@ -513,7 +538,7 @@ fun KeyboardView(
                         accentColor = accentColor,
                         onUpdateToolbarButtons = onUpdateToolbarButtons,
                         onDismiss = { currentRoute = KeyboardRoute.Keyboard },
-                        bottomPaddingDp = keyboardBottomPaddingDp, // 變量名已校對
+                        bottomPaddingDp = keyboardBottomPaddingDp,
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.CandidatePage -> CandidatePage(
