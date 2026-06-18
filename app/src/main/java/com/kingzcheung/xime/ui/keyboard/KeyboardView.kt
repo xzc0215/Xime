@@ -31,7 +31,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValueimport androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -171,11 +172,17 @@ fun KeyboardView(
         keyboardState = initialKeyboardLayoutState(isAsciiMode)
     }
 
-    Box(modifier = modifier.background(keyboardBgColor)) {
+    // ─── 定義鍵盤頂部圓角（左上/右上 16.dp，下部保持 0） ───
+    val topRoundedShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
+
+    Box(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
+                .clip(topRoundedShape) // 1. 裁剪出上邊框圓角
+                .background(keyboardBgColor.copy(alpha = 0.82f)) // 2. 半透明背景（透光率 18%）
+                .androidx.compose.ui.draw.blur(radius = 20.dp) // 3. 仿生毛玻璃模糊濾鏡
         ) {
             CandidateBar(
                 candidates = candidates.toList(),
@@ -201,7 +208,7 @@ fun KeyboardView(
                     ToolbarAction(button, onClick)
                 },
                 visuals = CandidateBarVisuals(
-                    backgroundColor = candidateBarBg,
+                    backgroundColor = candidateBarBg.copy(alpha = 0.6f), // 配合毛玻璃微調候選欄透明度
                     showClipboardHeader = candState.isShowingRecentClipboard,
                     textColor = candidateTextColor,
                     dividerColor = dividerColor,
@@ -245,7 +252,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = keyboardBgColor,
+                        keyboardBackgroundColor = Color.Transparent, // 設為透明以顯現底層毛玻璃
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme,
                         themeId = themeId,
@@ -259,8 +266,7 @@ fun KeyboardView(
                     )
                 }
                 else -> {
-                    // ─── 核心手勢修改區 ───
-                    // 完全移除光標滑動，只保留並攔截「下滑手勢」執行快捷符號輸入
+                    // ─── 僅保留「下滑手勢」執行快捷符號輸入 ───
                     val currentOnKeyPress = rememberUpdatedState(onKeyPress)
                     val cursorMod = Modifier.pointerInput(Unit) {
                         val swipeThresholdPx = 40.dp.toPx()
@@ -292,12 +298,10 @@ fun KeyboardView(
                                     break
                                 }
 
-                                // 嚴格下滑判定：垂直向下且角度大於 X 軸干擾
                                 if (dy > abs(dx) * 2f && dy > 10.dp.toPx()) {
                                     isSwipeDownGesture = true
-                                    event.changes.forEach { it.consume() } // 攔截事件
+                                    event.changes.forEach { it.consume() }
                                 } else if (abs(dx) > abs(dy) * 2f || dy < 0) {
-                                    // 左右滑或上滑直接視為無效操作，不響應
                                     isSwipeDownGesture = false
                                 }
                             } while (true)
@@ -362,7 +366,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = keyboardBgColor,
+                        keyboardBackgroundColor = Color.Transparent, // 設為透明以顯現底層毛玻璃
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp,
                         shadowShapeRadius = kbShadow.shapeRadius.dp,
@@ -541,7 +545,7 @@ fun KeyboardView(
                         accentColor = accentColor,
                         onUpdateToolbarButtons = onUpdateToolbarButtons,
                         onDismiss = { currentRoute = KeyboardRoute.Keyboard },
-                        bottomPaddingDp = keyboardBottomPaddingDp,
+                        bottomPaddingDp = keyboardPaddingDp,
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.CandidatePage -> CandidatePage(
