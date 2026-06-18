@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,8 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEvent
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.blur // 正確導入模糊擴展
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
@@ -172,7 +169,7 @@ fun KeyboardView(
         keyboardState = initialKeyboardLayoutState(isAsciiMode)
     }
 
-    // ─── 定義鍵盤頂部圓角（左上/右上 16.dp，下部保持 0） ───
+    // ─── 定義鍵盤頂部圓角（左上/右上 16.dp） ───
     val topRoundedShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
 
     Box(modifier = modifier) {
@@ -180,9 +177,9 @@ fun KeyboardView(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .clip(topRoundedShape) // 1. 裁剪出上邊框圓角
-                .background(keyboardBgColor.copy(alpha = 0.82f)) // 2. 半透明背景（透光率 18%）
-                .androidx.compose.ui.draw.blur(radius = 20.dp) // 3. 仿生毛玻璃模糊濾鏡
+                .clip(topRoundedShape) // 1. 裁剪圓角
+                .background(keyboardBgColor.copy(alpha = 0.82f)) // 2. 半透明背景
+                .blur(20.dp) // 3. 修復：正確調用毛玻璃模糊
         ) {
             CandidateBar(
                 candidates = candidates.toList(),
@@ -208,7 +205,7 @@ fun KeyboardView(
                     ToolbarAction(button, onClick)
                 },
                 visuals = CandidateBarVisuals(
-                    backgroundColor = candidateBarBg.copy(alpha = 0.6f), // 配合毛玻璃微調候選欄透明度
+                    backgroundColor = candidateBarBg.copy(alpha = 0.6f),
                     showClipboardHeader = candState.isShowingRecentClipboard,
                     textColor = candidateTextColor,
                     dividerColor = dividerColor,
@@ -252,7 +249,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 設為透明以顯現底層毛玻璃
+                        keyboardBackgroundColor = Color.Transparent,
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme,
                         themeId = themeId,
@@ -266,47 +263,8 @@ fun KeyboardView(
                     )
                 }
                 else -> {
-                    // ─── 僅保留「下滑手勢」執行快捷符號輸入 ───
-                    val currentOnKeyPress = rememberUpdatedState(onKeyPress)
-                    val cursorMod = Modifier.pointerInput(Unit) {
-                        val swipeThresholdPx = 40.dp.toPx()
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            var isSwipeDownGesture = false
-                            do {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                val dx = change.position.x - down.position.x
-                                val dy = change.position.y - down.position.y
-
-                                if (!change.pressed) {
-                                    if (isSwipeDownGesture && dy > swipeThresholdPx) {
-                                        event.changes.forEach { it.consume() }
-                                        val keyName = KeysConfigHelper.getKeyNameByCoordinates(
-                                            down.position.x, 
-                                            down.position.y, 
-                                            size.width, 
-                                            size.height
-                                        )
-                                        if (keyName != null) {
-                                            val swipeDownChar = KeysConfigHelper.getSwipeDownValue(keyName)
-                                            if (!swipeDownChar.isNullOrEmpty()) {
-                                                currentOnKeyPress.value.invoke(swipeDownChar, false)
-                                            }
-                                        }
-                                    }
-                                    break
-                                }
-
-                                if (dy > abs(dx) * 2f && dy > 10.dp.toPx()) {
-                                    isSwipeDownGesture = true
-                                    event.changes.forEach { it.consume() }
-                                } else if (abs(dx) > abs(dy) * 2f || dy < 0) {
-                                    isSwipeDownGesture = false
-                                }
-                            } while (true)
-                        }
-                    }
+                    // ─── 移除外層所有干擾滑動，將滑行識別全權放行給底層 Rime ───
+                    val cursorMod = Modifier
 
                     val fullScreenOnKeyPress: (String) -> Unit = { key ->
                         when (key) {
@@ -366,7 +324,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 設為透明以顯現底層毛玻璃
+                        keyboardBackgroundColor = Color.Transparent, // 透明以顯示外殼毛玻璃
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp,
                         shadowShapeRadius = kbShadow.shapeRadius.dp,
@@ -545,7 +503,7 @@ fun KeyboardView(
                         accentColor = accentColor,
                         onUpdateToolbarButtons = onUpdateToolbarButtons,
                         onDismiss = { currentRoute = KeyboardRoute.Keyboard },
-                        bottomPaddingDp = keyboardPaddingDp,
+                        bottomPaddingDp = keyboardBottomPaddingDp, // 修復變量名筆誤
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.CandidatePage -> CandidatePage(
