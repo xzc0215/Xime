@@ -92,7 +92,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
-import kotlin.math.min // 引入 Kotlin 原生 min 函數
+import kotlin.math.min // 使用 Kotlin 標準庫的 min
 
 class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, ActionExecutor {    
     companion object {        
@@ -401,7 +401,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val isLandscape = resources.configuration.screenWidthDp > screenHeightDp                
                 val orientationHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                
                 
-                // 修正：這裡改用 Kotlin 內建的 min(Int, Int) 函數，完美避免與 Java Math.min(Float, Float) 的歧義衝突
+                // 第一處修正：改用 Kotlin 的 min(Int, Int)
                 val displayHeight = min(orientationHeight, maxHeightDp)                
                 
                 val keyboardHeight = if (state.showKeyboardResize) {                    
@@ -515,7 +515,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             val isLandscape = config.screenWidthDp > config.screenHeightDp                                
                                             val currentHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                                
                                             val maxHeightDp = (config.screenHeightDp * 3) / 5                                
+                                            
+                                            // 第二處修正：這裡原先也是 Math.min，現同步改為 Kotlin 的 min(Int, Int)
                                             val displayHeight = min(currentHeight, maxHeightDp)                                
+                                            
                                             uiState.value = uiState.value.copy(                                    
                                                 showKeyboardResize = true,                                    
                                                 keyboardHeightDp = currentHeight,                                    
