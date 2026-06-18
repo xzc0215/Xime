@@ -399,7 +399,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val maxHeightDp = (screenHeightDp * 3) / 5                
                 val isLandscape = resources.configuration.screenWidthDp > screenHeightDp                
                 val orientationHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                
-                val displayHeight = Math.min(orientationHeight, maxHeightDp)                
+                
+                // 修正：強轉 Float 後呼叫 Math.min 避免 Argument type mismatch 錯誤
+                val displayHeight = Math.min(orientationHeight.toFloat(), maxHeightDp.toFloat()).toInt()                
+                
                 val keyboardHeight = if (state.showKeyboardResize) {                    
                     if (isLandscape) (screenHeightDp * 7) / 10 else maxHeightDp + 100                
                 } else {                    
@@ -511,7 +514,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             val isLandscape = config.screenWidthDp > config.screenHeightDp                                
                                             val currentHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                                
                                             val maxHeightDp = (config.screenHeightDp * 3) / 5                                
-                                            val displayHeight = Math.min(currentHeight, maxHeightDp)                                
+                                            val displayHeight = Math.min(currentHeight.toFloat(), maxHeightDp.toFloat()).toInt()                                
                                             uiState.value = uiState.value.copy(                                    
                                                 showKeyboardResize = true,                                    
                                                 keyboardHeightDp = currentHeight,                                    
@@ -529,8 +532,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return composeView    
     }
 
-    // 实现 ActionExecutor 要求的全部接口方法
-    override fun executeAction(action: String, value: String) {}
+    fun executeAction(action: String, value: String) {}
     override fun commitText(text: String) { currentInputConnection?.commitText(text, 1) }
     override fun performEditorMenuAction(actionId: Int) { currentInputConnection?.performEditorAction(actionId) }
     override fun sendKeyEvent(keyCode: Int) {
