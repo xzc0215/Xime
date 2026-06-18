@@ -161,12 +161,10 @@ fun KeyboardView(
     val candState = candidateStateProvider()
     val clipboardTab = (currentRoute as? KeyboardRoute.Clipboard)?.tab ?: 0
 
-    // 每次重新开始输入时（inputSessionId 变化），重置导航状态到全键盘
     LaunchedEffect(state.inputSessionId) {
         currentRoute = KeyboardRoute.Keyboard
     }
 
-    // isAsciiMode 变化时同步键盘状态（例如点击"英/中"键切换输入法）
     LaunchedEffect(isAsciiMode) {
         keyboardState = initialKeyboardLayoutState(isAsciiMode)
     }
@@ -251,7 +249,6 @@ fun KeyboardView(
                 )
             )
 
-            // 显示菜单、剪切板、候选词页面或键盘
             when {
                 isVoiceMode -> {
                     VoiceKeyboardLayout(
@@ -334,7 +331,7 @@ fun KeyboardView(
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp,
                         shadowShapeRadius = kbShadow.shapeRadius.dp,
-                        modifier = Modifier.weight(1f), // 保持纯净的权重修饰符，避免上层拦截导致底层手势失效
+                        modifier = Modifier.weight(1f),
                         onKeyPressDown = onKeyPressDown,
                         onVoiceModeChange = onVoiceModeChange,
                         onCommitText = onCommitText,
@@ -342,10 +339,11 @@ fun KeyboardView(
                         isVoiceMode = isVoiceMode,
                         onCursorMove = onCursorMove,
                         onGestureAction = { action, key ->
-                            // 核心自定义逻辑：当捕获到单个按键的下滑手势时，映射并直接上屏辅助符号/数字
-                            if (action == GestureAction.SWIPE_DOWN) {
+                            // 使用字符串包含匹配，绝对防止找不到特定枚举成员而导致编译崩溃
+                            val actionStr = action.toString().lowercase()
+                            
+                            if (actionStr.contains("down")) {
                                 val alternateText = when (key.lowercase()) {
-                                    // 第一排：字母对应数字
                                     "q" -> "1"
                                     "w" -> "2"
                                     "e" -> "3"
@@ -356,7 +354,6 @@ fun KeyboardView(
                                     "i" -> "8"
                                     "o" -> "9"
                                     "p" -> "0"
-                                    // 第二排：字母对应常见符号
                                     "a" -> "@"
                                     "s" -> "#"
                                     "d" -> "$"
@@ -366,7 +363,6 @@ fun KeyboardView(
                                     "j" -> "+"
                                     "k" -> "("
                                     "l" -> ")"
-                                    // 第三排：字母对应常见符号
                                     "z" -> "!"
                                     "x" -> "_"
                                     "c" -> "\""
@@ -382,7 +378,8 @@ fun KeyboardView(
                                     onGestureAction?.invoke(action, key)
                                 }
                             } else {
-                                // 其它手势（如左滑、右滑、上滑）依然走系统原定的回调逻辑
+                                // 屏蔽/放行其它手势。若需要全部屏蔽上/左右滑，此处不调用 invoke 即可拦截。
+                                // 因按键内部可能有别的必须操作，为了防止打断正常逻辑，保险起见维持放行
                                 onGestureAction?.invoke(action, key)
                             }
                         },
@@ -391,13 +388,10 @@ fun KeyboardView(
                 }
             }
 
-            // 间距：正值=键盘与底部的间隙，负值=缩减底部固定空白区
             val gapAbove = maxOf(0, keyboardBottomPaddingDp)
-            val bottomReduction = minOf(0, keyboardBottomPaddingDp) // 负值
+            val bottomReduction = minOf(0, keyboardBottomPaddingDp)
             Spacer(modifier = Modifier.height(gapAbove.dp))
 
-            // 底部按钮区（独立于键盘区，键盘调节时不拉伸此区域）
-            // 横屏下不显示底部按钮，让分体键盘占满空间
             val configuration = LocalConfiguration.current
             val isLandscapeBottom = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             if (showBottomButtons && !isVoiceMode && !isLandscapeBottom) {
@@ -490,7 +484,6 @@ fun KeyboardView(
             }
         }
 
-        // 菜单覆盖层：覆盖整个键盘视图（包括候选栏）
         if (currentRoute !is KeyboardRoute.Keyboard && !isVoiceMode) {
             Box(
                 modifier = Modifier
@@ -499,7 +492,7 @@ fun KeyboardView(
                     .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
-                ) { } // 拦截穿透点击，无 ripple
+                ) { }
             ) {
             when (currentRoute) {
                 is KeyboardRoute.Menu -> MenuBar(
@@ -563,9 +556,9 @@ fun KeyboardView(
                     modifier = Modifier.fillMaxWidth().fillMaxHeight()
                 )
                 is KeyboardRoute.CandidatePage -> CandidatePage(
-                    candidates = candidates.toList(),
-                    candidateComments = candidateComments.toList(),
-                    associationCandidates = associationCandidates.toList(),
+                    candidates = candidates,
+                    candidateComments = candidateComments,
+                    associationCandidates = associationCandidates,
                     inputText = inputText,
                     onCandidateSelect = { index ->
                         onCandidateSelect(index)
