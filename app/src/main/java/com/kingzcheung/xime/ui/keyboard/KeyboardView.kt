@@ -172,14 +172,25 @@ fun KeyboardView(
     // ─── 定義鍵盤頂部圓角（左上/右上 16.dp） ───
     val topRoundedShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .clip(topRoundedShape) // 限制整體圓角框
+    ) {
+        // 【第一層：獨立背景毛玻璃層】只做背景模糊，絕不連累文字
+        Spacer(
+            modifier = Modifier
+                .matchParentSize()
+                .background(keyboardBgColor.copy(alpha = 0.75f)) // 半透明背景
+                .blur(20.dp) // 精準毛玻璃
+        )
+
+        // 【第二層：UI 內容層】完全清晰，不受模糊濾鏡影響
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .clip(topRoundedShape) // 1. 裁剪圓角
-                .background(keyboardBgColor.copy(alpha = 0.82f)) // 2. 半透明背景
-                .blur(20.dp) // 3. 修復：正確調用毛玻璃模糊
         ) {
             CandidateBar(
                 candidates = candidates.toList(),
@@ -205,7 +216,7 @@ fun KeyboardView(
                     ToolbarAction(button, onClick)
                 },
                 visuals = CandidateBarVisuals(
-                    backgroundColor = candidateBarBg.copy(alpha = 0.6f),
+                    backgroundColor = candidateBarBg.copy(alpha = 0.4f), // 稍微降低透明度，讓背景毛玻璃更好看
                     showClipboardHeader = candState.isShowingRecentClipboard,
                     textColor = candidateTextColor,
                     dividerColor = dividerColor,
@@ -249,7 +260,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent,
+                        keyboardBackgroundColor = Color.Transparent, // 透明以顯現底層毛玻璃
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme,
                         themeId = themeId,
@@ -263,7 +274,6 @@ fun KeyboardView(
                     )
                 }
                 else -> {
-                    // ─── 移除外層所有干擾滑動，將滑行識別全權放行給底層 Rime ───
                     val cursorMod = Modifier
 
                     val fullScreenOnKeyPress: (String) -> Unit = { key ->
@@ -324,7 +334,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 透明以顯示外殼毛玻璃
+                        keyboardBackgroundColor = Color.Transparent, // 保持透明
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp,
                         shadowShapeRadius = kbShadow.shapeRadius.dp,
@@ -503,7 +513,7 @@ fun KeyboardView(
                         accentColor = accentColor,
                         onUpdateToolbarButtons = onUpdateToolbarButtons,
                         onDismiss = { currentRoute = KeyboardRoute.Keyboard },
-                        bottomPaddingDp = keyboardBottomPaddingDp, // 修復變量名筆誤
+                        bottomPaddingDp = keyboardBottomPaddingDp, // 變量名已校對
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.CandidatePage -> CandidatePage(
