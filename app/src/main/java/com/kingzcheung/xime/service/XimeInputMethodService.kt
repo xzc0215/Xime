@@ -36,6 +36,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,7 +79,8 @@ import com.kingzcheung.xime.ui.theme.XimeTheme
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.keyboard.ActionExecutor
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStartimport kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -90,7 +92,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
-import kotlin.math.min
 
 class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, ActionExecutor {    
     companion object {        
@@ -227,9 +228,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }    
     }    
 
-    /**
-     * 核心新增：強制將輸入法視窗配置為透明背景並啟用硬體加速，否則 Compose 毛玻璃濾鏡會失效。
-     */
     override fun onConfigureWindow(win: Window?, isDynamicOrder: Boolean, isMoveRequested: Boolean) {
         super.onConfigureWindow(win, isDynamicOrder, isMoveRequested)
         win?.let { window ->
@@ -297,9 +295,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     notifyDeploymentStatus(true, "正在编译词库...")                    
                     val alreadyCompiled = RimeConfigHelper.isDeploymentComplete(this@XimeInputMethodService)                    
                     val maintenanceStarted = rimeEngine.startMaintenance(!alreadyCompiled)                    
-                    if (!maintenanceStarted) {                        
-                        val deployed = rimeEngine.deploy()                    
-                    }                    
                     val maintaining = rimeEngine.isMaintaining()                    
                     if (maintaining) {                        
                         var maintenanceWaited = 0L                        
@@ -404,7 +399,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val maxHeightDp = (screenHeightDp * 3) / 5                
                 val isLandscape = resources.configuration.screenWidthDp > screenHeightDp                
                 val orientationHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                
-                val displayHeight = minOf(orientationHeight, maxHeightDp)                
+                val displayHeight = Math.min(orientationHeight, maxHeightDp)                
                 val keyboardHeight = if (state.showKeyboardResize) {                    
                     if (isLandscape) (screenHeightDp * 7) / 10 else maxHeightDp + 100                
                 } else {                    
@@ -447,7 +442,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     .fillMaxWidth()                                
                                     .padding(bottom = 0.dp)                                
                                     .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.resizePreviewBottomPaddingDp).dp else (keyboardHeight + state.keyboardBottomPaddingDp).dp),                            
-                                color = Color.Transparent // 修正點：必須將 Surface 背景設為完全透明，否則會覆蓋並阻擋 Compose 的毛玻璃濾鏡效果
+                                color = Color.Transparent 
                             ) {                        
                                 CompositionLocalProvider(LocalStretchFactor provides state.stretchFactor) {                            
                                     KeyboardView(                                
@@ -489,13 +484,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         } },                            
                                         onCursorMove = remember { { direction: Int ->                                
                                             val ic = currentInputConnection                                
-                                            if (ic != null) {                                    
-                                                val textBefore = ic.getTextBeforeCursor(Int.MAX_VALUE, 0)                                    
-                                                val textAfter = ic.getTextAfterCursor(Int.MAX_VALUE, 0)                                    
-                                                val selStart = textBefore?.length ?: 0                                    
-                                                val totalLen = selStart + (textAfter?.length ?: 0)                                    
-                                                val newSel = (selStart + direction).coerceIn(0, totalLen)                                    
-                                                ic.setSelection(newSel, newSel)                                
+                                            if (ic != null) {                                                
+                                                val textBefore = ic.getTextBeforeCursor(Int.MAX_VALUE, 0)                                                
+                                                val textAfter = ic.getTextAfterCursor(Int.MAX_VALUE, 0)                                                
+                                                val selStart = textBefore?.length ?: 0                                                
+                                                val totalLen = selStart + (textAfter?.length ?: 0)                                                
+                                                val newSel = (selStart + direction).coerceIn(0, totalLen)                                                
+                                                ic.setSelection(newSel, newSel)                                            
                                             }                            
                                         } },                            
                                         onGestureAction = remember { { action, value -> action.execute(this@XimeInputMethodService, value) } },                            
@@ -516,7 +511,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             val isLandscape = config.screenWidthDp > config.screenHeightDp                                
                                             val currentHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                                
                                             val maxHeightDp = (config.screenHeightDp * 3) / 5                                
-                                            val displayHeight = minOf(currentHeight, maxHeightDp)                                
+                                            val displayHeight = Math.min(currentHeight, maxHeightDp)                                
                                             uiState.value = uiState.value.copy(                                    
                                                 showKeyboardResize = true,                                    
                                                 keyboardHeightDp = currentHeight,                                    
@@ -534,8 +529,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return composeView    
     }
 
-    // 以下為 ActionExecutor 介面與其餘輸入法核心方法存根以確保編譯通過
+    // 实现 ActionExecutor 要求的全部接口方法
     override fun executeAction(action: String, value: String) {}
+    override fun commitText(text: String) { currentInputConnection?.commitText(text, 1) }
+    override fun performEditorMenuAction(actionId: Int) { currentInputConnection?.performEditorAction(actionId) }
+    override fun sendKeyEvent(keyCode: Int) {
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+    }
+    override fun executeCommand(name: String) {}
+    override fun repeatLastInput() {}
+
     private fun keyCodeToKey(keyCode: Int, isShiftPressed: Boolean): String? = null
     private fun handleKeyPress(key: String, isShifted: Boolean) {}
     private fun selectCandidate(index: Int) {}
