@@ -39,11 +39,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
-import Math.abs
+import kotlin.math.abs
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.keyboard.KeyboardRoute
@@ -57,8 +58,6 @@ import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.settings.SchemaListView
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.keyboard.GestureAction
-
-// 移除了所有導致編譯衝突的模擬 Stub Class 宣告，直接呼叫專案真實組件
 
 val LocalStretchFactor = compositionLocalOf { 1f }
 
@@ -172,7 +171,6 @@ fun KeyboardView(
                 clip = true 
             }
     ) {
-        // 第一層：獨立毛玻璃濾鏡背景
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -187,7 +185,6 @@ fun KeyboardView(
                 .background(keyboardBgColor.copy(alpha = 0.55f))
         )
 
-        // 第二層：UI 與交互層
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -195,8 +192,8 @@ fun KeyboardView(
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
-                            val totalX = abs(dragAmount.x.toDouble()).toFloat()
-                            val totalY = abs(dragAmount.y.toDouble()).toFloat()
+                            val totalX = abs(dragAmount.x)
+                            val totalY = abs(dragAmount.y)
                             if (dragAmount.y > 0 && totalY > totalX * 1.5f) {
                                 change.consume()
                             }
@@ -337,8 +334,8 @@ fun KeyboardView(
                         specialKeyBackgroundColor = specialKeyBgColor,
                         keyboardBackgroundColor = Color.Transparent, 
                         shadowEnabled = kbShadow.enabled,
-                        shadowElevation = kbShadow.elevation.dp.value,
-                        shadowShapeRadius = kbShadow.shapeRadius.dp.value,
+                        shadowElevation = kbShadow.elevation.dp,
+                        shadowShapeRadius = kbShadow.shapeRadius.dp,
                         modifier = Modifier.weight(1f),
                         onKeyPressDown = onKeyPressDown,
                         onVoiceModeChange = onVoiceModeChange,
