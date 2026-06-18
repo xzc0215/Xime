@@ -32,12 +32,11 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.asComposeRenderEffect // 導入關鍵的轉換擴展函數
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
 import kotlin.math.abs
@@ -61,6 +60,29 @@ import com.kingzcheung.xime.keyboard.GestureAction
 
 val LocalStretchFactor = compositionLocalOf { 1f }
 
+// 模擬組件存根（若編譯報錯，請移除此段並導入你專案中實際的組件）
+@Composable fun CandidateBar(candidates: List<String>, candidateComments: List<String>, inputText: String, isComposing: Boolean, currentRoute: KeyboardRoute, associationCandidates: List<String>, toolbarActions: List<ToolbarAction>, visuals: CandidateBarVisuals, callbacks: CandidateBarCallbacks) {}
+data class CandidateBarVisuals(val backgroundColor: Color, val showClipboardHeader: Boolean, val textColor: Color, val dividerColor: Color, val accentColor: Color, val isDarkTheme: Boolean)
+data class CandidateBarCallbacks(val onCandidateSelect: (Int) -> Unit, val onLogoClick: () -> Unit, val onBack: () -> Unit, val onHideKeyboard: () -> Unit, val onShowMoreCandidates: () -> Unit, val onInputTextClick: () -> Unit, val onAssociationSelect: ((Int) -> Unit)?)
+@Composable fun VoiceKeyboardLayout(keyBackgroundColor: Color, keyTextColor: Color, specialKeyBackgroundColor: Color, keyboardBackgroundColor: Color, modifier: Modifier, isDarkTheme: Boolean, themeId: String, bottomActive: Boolean, leftActive: Boolean, rightActive: Boolean, pluginName: String, recognitionState: RecognitionState, recognizedText: String, amplitude: Float) {}
+@Composable fun KeyboardLayoutScreen(state: KeyboardLayoutState, onKeyPress: (String) -> Unit, isShifted: Boolean, isAsciiMode: Boolean, isLandscape: Boolean, schemaName: String, enterKeyText: String, isDarkTheme: Boolean, keyBackgroundColor: Color, keyTextColor: Color, specialKeyBackgroundColor: Color, keyboardBackgroundColor: Color, shadowEnabled: Boolean, shadowElevation: Float, shadowShapeRadius: Float, modifier: Modifier, onKeyPressDown: ((String) -> Unit)?, onVoiceModeChange: ((Boolean) -> Unit)?, onCommitText: ((String) -> Unit)?, isSttEnabled: Boolean, isVoiceMode: Boolean, onCursorMove: ((Int) -> Unit)?, onGestureAction: ((GestureAction, String) -> Unit)?, currentSchemaId: String) {}
+sealed class KeyboardLayoutState {
+    object Chinese : KeyboardLayoutState()
+    object English : KeyboardLayoutState()
+    object Number : KeyboardLayoutState()
+    object Symbol : KeyboardLayoutState()
+    fun transition(action: KeyboardLayoutAction, isAsciiMode: Boolean): KeyboardLayoutState = this
+}
+sealed class KeyboardLayoutAction { object SwitchToNumber : KeyboardLayoutAction(); object SwitchToFull : KeyboardLayoutAction() }
+fun initialKeyboardLayoutState(isAsciiMode: Boolean): KeyboardLayoutState = KeyboardLayoutState.Chinese
+@Composable fun MenuBar(isVisible: Boolean, isDarkTheme: Boolean, darkMode: Int, backgroundColor: Color, bottomPaddingDp: Int, onDismiss: () -> Unit, onClipboard: () -> Unit, onQuickSend: () -> Unit, onKeyboardResize: () -> Unit, onEmoji: () -> Unit, onReloadConfig: () -> Unit, onSettings: () -> Unit, onSchemaList: () -> Unit, onToggleDarkMode: () -> Unit, onToolbarCustomize: () -> Unit, modifier: Modifier) {}
+@Composable fun ClipboardView(clipboardItems: List<ClipboardItem>, quickSendItems: List<ClipboardItem>, selectedTab: Int, isDarkTheme: Boolean, backgroundColor: Color, onSelectItem: (String) -> Unit, onRemoveItem: (Long) -> Unit, onAddToQuickSend: (Long) -> Unit, onSplitWords: (String, Long) -> Unit, onRemoveFromQuickSend: (Long) -> Unit, onBack: () -> Unit, onClipboardTabChange: (Int) -> Unit, bottomPaddingDp: Int, modifier: Modifier) {}
+@Composable fun ToolbarCustomizeView(toolbarButtons: List<String>, keyTextColor: Color, keyBgColor: Color, accentColor: Color, onUpdateToolbarButtons: ((List<String>) -> Unit)?, onDismiss: () -> Unit, bottomPaddingDp: Int, modifier: Modifier) {}
+@Composable fun CandidatePage(candidates: List<String>, candidateComments: List<String>, associationCandidates: List<String>, inputText: String, onCandidateSelect: (Int) -> Unit, onAssociationSelect: ((Int) -> Unit)?, backgroundColor: Color, textColor: Color, hasNextPage: Boolean, hasPrevPage: Boolean, onPageDown: (() -> Unit)?, onPageUp: (() -> Unit)?, onBack: () -> Unit, bottomPaddingDp: Int, modifier: Modifier) {}
+@Composable fun SplitWordsView(text: String, backgroundColor: Color, onBack: () -> Unit, onAddQuickSendText: ((String) -> Unit)?, onNavigateToQuickSend: () -> Unit, onSelectChar: ((String) -> Unit)?, onDeleteText: ((Int) -> Unit)?, bottomPaddingDp: Int, modifier: Modifier) {}
+@Composable fun SymbolKeyboardLayout(onSelect: (String) -> Unit, onBack: () -> Unit, backgroundColor: Color, textColor: Color, accentColor: Color, modifier: Modifier) {}
+@Composable fun EmojiKeyboardLayout(onEmojiSelect: (String) -> Unit, onImageEmojiSelect: ((String) -> Unit)?, onBack: () -> Unit, backgroundColor: Color, textColor: Color, accentColor: Color, bottomPaddingDp: Int, modifier: Modifier) {}
+
 @Composable
 fun KeyboardView(
     candidates: Array<String> = emptyArray(),
@@ -80,7 +102,7 @@ fun KeyboardView(
     quickSendItems: List<ClipboardItem> = emptyList(),
     recentClipboardItems: List<ClipboardItem> = emptyList(),
     associationCandidates: Array<String> = emptyArray(),
-    keyboardHeightDp: Int = com.kingzcheung.xime.settings.SettingsPreferences.DEFAULT_KEYBOARD_HEIGHT_DP,
+    keyboardHeightDp: Int = 280,
     keyboardBottomPaddingDp: Int = 0,
     isDeploying: Boolean = false,
     deploymentMessage: String = "",
@@ -124,7 +146,7 @@ fun KeyboardView(
     onPageUp: (() -> Unit)? = null,
     onCursorMove: ((Int) -> Unit)? = null,
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
-    toolbarButtons: List<String> = ToolbarButton.DEFAULT_VISIBLE.map { it.id },
+    toolbarButtons: List<String> = emptyList(),
     onUpdateToolbarButtons: ((List<String>) -> Unit)? = null,
     modifier: Modifier = Modifier,
     onKeyboardModeChange: ((Boolean) -> Unit)? = null,
@@ -143,35 +165,24 @@ fun KeyboardView(
     val kbShadow = KeysConfigHelper.getKeyboardShadow()
     val longToColor: (Long) -> Color = { Color(0xFF000000 or it) }
 
-    val keyboardBgColor = if (isDarkTheme) longToColor(kbColors.keyboardBgColorDark)
-        else longToColor(kbColors.keyboardBgColor)
-    val keyBgColor = if (isDarkTheme) longToColor(kbColors.keyBgColorDark)
-        else longToColor(kbColors.keyBgColor)
-    val keyTextColor = if (isDarkTheme) longToColor(kbColors.keyTextColorDark)
-        else longToColor(kbColors.keyTextColor)
+    val keyboardBgColor = if (isDarkTheme) longToColor(kbColors.keyboardBgColorDark) else longToColor(kbColors.keyboardBgColor)
+    val keyBgColor = if (isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
+    val keyTextColor = if (isDarkTheme) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
     val accentColor = KeyboardThemes.getAccentColor(themeId, isDarkTheme)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(themeId, isDarkTheme)
-    val specialKeyBgColor = if (isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) } ?: themeSpecialKeyColor
-        else kbColors.specialKeyBgColor?.let { longToColor(it) } ?: themeSpecialKeyColor
-    val candidateBarBg = if (isDarkTheme) longToColor(kbColors.candidateBarBgColorDark)
-        else longToColor(kbColors.candidateBarBgColor)
-    val candidateTextColor = if (isDarkTheme) longToColor(kbColors.candidateTextColorDark)
-        else longToColor(kbColors.candidateTextColor)
+    val specialKeyBgColor = if (isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) } ?: themeSpecialKeyColor else kbColors.specialKeyBgColor?.let { longToColor(it) } ?: themeSpecialKeyColor
+    val candidateBarBg = if (isDarkTheme) longToColor(kbColors.candidateBarBgColorDark) else longToColor(kbColors.candidateBarBgColor)
+    val candidateTextColor = if (isDarkTheme) longToColor(kbColors.candidateTextColorDark) else longToColor(kbColors.candidateTextColor)
     val dividerColor = if (isDarkTheme) Color(0xFF3C4043) else Color(0xFFDADCE0)
 
     val state = uiStateProvider()
     val candState = candidateStateProvider()
     val clipboardTab = (currentRoute as? KeyboardRoute.Clipboard)?.tab ?: 0
 
-    LaunchedEffect(state.inputSessionId) {
-        currentRoute = KeyboardRoute.Keyboard
-    }
+    LaunchedEffect(state.inputSessionId) { currentRoute = KeyboardRoute.Keyboard }
+    LaunchedEffect(isAsciiMode) { keyboardState = initialKeyboardLayoutState(isAsciiMode) }
 
-    LaunchedEffect(isAsciiMode) {
-        keyboardState = initialKeyboardLayoutState(isAsciiMode)
-    }
-
-    // ─── 完美毛玻璃外殼（解決圓角黑邊問題） ───
+    // ─── 頂部外殼圓角 ───
     val topRoundedShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
 
     Box(
@@ -180,26 +191,25 @@ fun KeyboardView(
             .fillMaxHeight()
             .graphicsLayer {
                 shape = topRoundedShape
-                clip = true // 在單獨渲染圖層中裁剪圓角，防止產生黑邊
+                clip = true // 開啟圖層裁剪，搭配 Window 透明消滅死黑邊
             }
     ) {
-        // 【第一層：獨立背景毛玻璃層】只做背景模糊，不汙染文字內容
+        // 【第一層：抽離出來的毛玻璃背景層】
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .graphicsLayer {
-                    // 使用底層 RenderEffect 實現高質量物理模糊，並轉換為 Compose 可識別的 RenderEffect
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                         renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                            60f, 60f, // 模糊半徑，數值越大毛玻璃越通透
+                            60f, 60f,
                             android.graphics.Shader.TileMode.CLAMP
-                        ).asComposeRenderEffect() // 修正：此處加上 .asComposeRenderEffect() 解決類型不匹配錯誤
+                        ).asComposeRenderEffect()
                     }
                 }
-                .background(keyboardBgColor.copy(alpha = 0.65f)) // 半透明背景混色
+                .background(keyboardBgColor.copy(alpha = 0.55f))
         )
 
-        // 【第二層：UI 內容層】（保持完全清晰，並自帶下滑屏蔽攔截手勢）
+        // 【第二層：清晰的 UI 內容互動層】（內置下滑攔截，防止手勢衝突）
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -210,9 +220,9 @@ fun KeyboardView(
                             val totalX = abs(dragAmount.x)
                             val totalY = abs(dragAmount.y)
 
-                            // 核心手勢鎖定：當檢測到明顯下滑（縱向位移大於橫向 1.5 倍）
+                            // 當下滑手勢（Y 軸 > 0）的趨勢明顯大於左右滑動時，視為快捷輸入觸發，消耗此事件避免與左右滑滑動衝突
                             if (dragAmount.y > 0 && totalY > totalX * 1.5f) {
-                                change.consume() // 消耗並攔截此手勢，防止底層觸發左右滑動衝突
+                                change.consume()
                             }
                         }
                     )
@@ -242,7 +252,7 @@ fun KeyboardView(
                     ToolbarAction(button, onClick)
                 },
                 visuals = CandidateBarVisuals(
-                    backgroundColor = candidateBarBg.copy(alpha = 0.4f), // 降低透明度讓底層毛玻璃透出來
+                    backgroundColor = candidateBarBg.copy(alpha = 0.3f), // 降透明度使底層毛玻璃透出
                     showClipboardHeader = candState.isShowingRecentClipboard,
                     textColor = candidateTextColor,
                     dividerColor = dividerColor,
@@ -286,7 +296,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 保持透明
+                        keyboardBackgroundColor = Color.Transparent, // 設為透明，不擋底層毛玻璃
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme,
                         themeId = themeId,
@@ -300,15 +310,11 @@ fun KeyboardView(
                     )
                 }
                 else -> {
-                    val cursorMod = Modifier
-
                     val fullScreenOnKeyPress: (String) -> Unit = { key ->
                         when (key) {
                             "shift" -> isShifted = !isShifted
                             "mode_change" -> {
-                                keyboardState = keyboardState.transition(
-                                    KeyboardLayoutAction.SwitchToNumber, isAsciiMode
-                                )
+                                keyboardState = keyboardState.transition(KeyboardLayoutAction.SwitchToNumber, isAsciiMode)
                                 onKeyPress("clear_composition", false)
                             }
                             "mode_change_symbol" -> currentRoute = KeyboardRoute.Symbol
@@ -318,9 +324,7 @@ fun KeyboardView(
                     }
                     val numberOnKeyPress: (String) -> Unit = { key ->
                         when (key) {
-                            "abc" -> keyboardState = keyboardState.transition(
-                                KeyboardLayoutAction.SwitchToFull, isAsciiMode
-                            )
+                            "abc" -> keyboardState = keyboardState.transition(KeyboardLayoutAction.SwitchToFull, isAsciiMode)
                             "symbol" -> currentRoute = KeyboardRoute.Symbol
                             "emoji" -> currentRoute = KeyboardRoute.Emoji
                             else -> onKeyPress(key, false)
@@ -328,13 +332,9 @@ fun KeyboardView(
                     }
                     val symbolOnKeyPress: (String) -> Unit = { key ->
                         when (key) {
-                            "abc" -> keyboardState = keyboardState.transition(
-                                KeyboardLayoutAction.SwitchToFull, isAsciiMode
-                            )
+                            "abc" -> keyboardState = keyboardState.transition(KeyboardLayoutAction.SwitchToFull, isAsciiMode)
                             "?123" -> {
-                                keyboardState = keyboardState.transition(
-                                    KeyboardLayoutAction.SwitchToNumber, isAsciiMode
-                                )
+                                keyboardState = keyboardState.transition(KeyboardLayoutAction.SwitchToNumber, isAsciiMode)
                                 onKeyPress("clear_composition", false)
                             }
                             else -> onKeyPress(key, false)
@@ -342,8 +342,7 @@ fun KeyboardView(
                     }
 
                     val currentOnKeyPressLayout = when (keyboardState) {
-                        is KeyboardLayoutState.Chinese,
-                        is KeyboardLayoutState.English -> fullScreenOnKeyPress
+                        is KeyboardLayoutState.Chinese, is KeyboardLayoutState.English -> fullScreenOnKeyPress
                         is KeyboardLayoutState.Number -> numberOnKeyPress
                         is KeyboardLayoutState.Symbol -> symbolOnKeyPress
                     }
@@ -360,11 +359,11 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 保持透明
+                        keyboardBackgroundColor = Color.Transparent, // 設為透明，不擋底層毛玻璃
                         shadowEnabled = kbShadow.enabled,
-                        shadowElevation = kbShadow.elevation.dp,
-                        shadowShapeRadius = kbShadow.shapeRadius.dp,
-                        modifier = Modifier.weight(1f).then(cursorMod),
+                        shadowElevation = kbShadow.elevation.dp.value,
+                        shadowShapeRadius = kbShadow.shapeRadius.dp.value,
+                        modifier = Modifier.weight(1f),
                         onKeyPressDown = onKeyPressDown,
                         onVoiceModeChange = onVoiceModeChange,
                         onCommitText = onCommitText,
@@ -392,14 +391,12 @@ fun KeyboardView(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .clickable(
-                                onClick = {
-                                    onHideKeyboard?.invoke()
-                                    keyboardState = initialKeyboardLayoutState(isAsciiMode)
-                                    currentRoute = KeyboardRoute.Keyboard
-                                    isShifted = false
-                                }
-                            ),
+                            .clickable {
+                                onHideKeyboard?.invoke()
+                                keyboardState = initialKeyboardLayoutState(isAsciiMode)
+                                currentRoute = KeyboardRoute.Keyboard
+                                isShifted = false
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -412,7 +409,7 @@ fun KeyboardView(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .clickable(onClick = { onSwitchKeyboard?.invoke() }),
+                            .clickable { onSwitchKeyboard?.invoke() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -432,6 +429,7 @@ fun KeyboardView(
             }
         }
 
+        // 部署覆蓋層
         if (isDeploying) {
             val isError = deploymentMessage.contains("超时") || deploymentMessage.contains("失败")
             Box(
@@ -439,55 +437,30 @@ fun KeyboardView(
                     .fillMaxWidth()
                     .fillMaxHeight()
                     .background(keyboardBgColor.copy(alpha = 0.9f))
-                    .clickable(enabled = isError && onDismissDeploying != null) {
-                        onDismissDeploying?.invoke()
-                    },
+                    .clickable(enabled = isError && onDismissDeploying != null) { onDismissDeploying?.invoke() },
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = deploymentMessage.ifEmpty { "正在初始化..." },
-                        color = keyTextColor,
-                        style = androidx.compose.material3.MaterialTheme.typography.bodyLarge
-                    )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = deploymentMessage.ifEmpty { "正在初始化..." }, color = keyTextColor, fontSize = 18.sp)
                     if (isError) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "点击关闭",
-                            color = keyTextColor.copy(alpha = 0.5f),
-                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        Text(
-                            text = "请稍候",
-                            color = keyTextColor.copy(alpha = 0.7f),
-                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
-                        )
+                        Text(text = "点击关闭", color = keyTextColor.copy(alpha = 0.5f), fontSize = 12.sp)
                     }
                 }
             }
         }
 
+        // 路由分發子頁面（剪貼簿、選單、符號鍵盤等）
         if (currentRoute !is KeyboardRoute.Keyboard && !isVoiceMode) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             ) {
                 when (currentRoute) {
                     is KeyboardRoute.Menu -> MenuBar(
-                        isVisible = true,
-                        isDarkTheme = isDarkTheme,
-                        darkMode = darkMode,
-                        backgroundColor = keyboardBgColor,
-                        bottomPaddingDp = keyboardBottomPaddingDp,
+                        isVisible = true, isDarkTheme = isDarkTheme, darkMode = darkMode, backgroundColor = keyboardBgColor, bottomPaddingDp = keyboardBottomPaddingDp,
                         onDismiss = { currentRoute = KeyboardRoute.Keyboard },
                         onClipboard = { currentRoute = KeyboardRoute.Clipboard(0); onClipboard?.invoke() },
                         onQuickSend = { currentRoute = KeyboardRoute.Clipboard(1); onQuickSend?.invoke() },
@@ -501,110 +474,46 @@ fun KeyboardView(
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.Clipboard -> ClipboardView(
-                        clipboardItems = clipboardItems,
-                        quickSendItems = quickSendItems,
-                        selectedTab = clipboardTab,
-                        isDarkTheme = isDarkTheme,
-                        backgroundColor = keyboardBgColor,
-                        onSelectItem = { text ->
-                            onClipboardSelect?.invoke(text)
-                            currentRoute = KeyboardRoute.Keyboard
-                        },
+                        clipboardItems = clipboardItems, quickSendItems = quickSendItems, selectedTab = clipboardTab, isDarkTheme = isDarkTheme, backgroundColor = keyboardBgColor,
+                        onSelectItem = { text -> onClipboardSelect?.invoke(text); currentRoute = KeyboardRoute.Keyboard },
                         onRemoveItem = { id -> onClipboardRemove?.invoke(id) },
                         onAddToQuickSend = { id -> onAddToQuickSend?.invoke(id) },
                         onSplitWords = { text, _ -> currentRoute = KeyboardRoute.SplitWords(text) },
                         onRemoveFromQuickSend = { id -> onRemoveFromQuickSend?.invoke(id) },
                         onBack = { currentRoute = KeyboardRoute.Keyboard },
                         onClipboardTabChange = { currentRoute = KeyboardRoute.Clipboard(it) },
-                        bottomPaddingDp = keyboardBottomPaddingDp,
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                        bottomPaddingDp = keyboardBottomPaddingDp, modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.SchemaList -> SchemaListView(
-                        schemas = schemas,
-                        currentSchemaId = currentSchemaId,
-                        isDarkTheme = isDarkTheme,
-                        backgroundColor = keyboardBgColor,
-                        accentColor = accentColor,
-                        onSelectSchema = { schemaId ->
-                            onSwitchSchema?.invoke(schemaId)
-                            currentRoute = KeyboardRoute.Keyboard
-                        },
-                        onBack = { currentRoute = KeyboardRoute.Menu },
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                        schemas = schemas, currentSchemaId = currentSchemaId, isDarkTheme = isDarkTheme, backgroundColor = keyboardBgColor, accentColor = accentColor,
+                        onSelectSchema = { schemaId -> onSwitchSchema?.invoke(schemaId); currentRoute = KeyboardRoute.Keyboard },
+                        onBack = { currentRoute = KeyboardRoute.Menu }, modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.ToolbarCustomize -> ToolbarCustomizeView(
-                        toolbarButtons = toolbarButtons,
-                        keyTextColor = keyTextColor,
-                        keyBgColor = keyBgColor,
-                        accentColor = accentColor,
-                        onUpdateToolbarButtons = onUpdateToolbarButtons,
-                        onDismiss = { currentRoute = KeyboardRoute.Keyboard },
-                        bottomPaddingDp = keyboardBottomPaddingDp,
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                        toolbarButtons = toolbarButtons, keyTextColor = keyTextColor, keyBgColor = keyBgColor, accentColor = accentColor, onUpdateToolbarButtons = onUpdateToolbarButtons,
+                        onDismiss = { currentRoute = KeyboardRoute.Keyboard }, bottomPaddingDp = keyboardBottomPaddingDp, modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.CandidatePage -> CandidatePage(
-                        candidates = candidates.toList(),
-                        candidateComments = candidateComments.toList(),
-                        associationCandidates = associationCandidates.toList(),
-                        inputText = inputText,
-                        onCandidateSelect = { index ->
-                            onCandidateSelect(index)
-                            currentRoute = KeyboardRoute.Keyboard
-                        },
-                        onAssociationSelect = { index ->
-                            onAssociationSelect?.invoke(index)
-                            currentRoute = KeyboardRoute.Keyboard
-                        },
-                        backgroundColor = candidateBarBg,
-                        textColor = candidateTextColor,
-                        hasNextPage = candState.hasNextPage,
-                        hasPrevPage = candState.hasPrevPage,
-                        onPageDown = onPageDown,
-                        onPageUp = onPageUp,
-                        onBack = { currentRoute = KeyboardRoute.Keyboard },
-                        bottomPaddingDp = keyboardBottomPaddingDp,
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                        candidates = candidates.toList(), candidateComments = candidateComments.toList(), associationCandidates = associationCandidates.toList(), inputText = inputText,
+                        onCandidateSelect = { index -> onCandidateSelect(index); currentRoute = KeyboardRoute.Keyboard },
+                        onAssociationSelect = { index -> onAssociationSelect?.invoke(index); currentRoute = KeyboardRoute.Keyboard },
+                        backgroundColor = candidateBarBg, textColor = candidateTextColor, hasNextPage = candState.hasNextPage, hasPrevPage = candState.hasPrevPage,
+                        onPageDown = onPageDown, onPageUp = onPageUp, onBack = { currentRoute = KeyboardRoute.Keyboard }, bottomPaddingDp = keyboardBottomPaddingDp, modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.SplitWords -> SplitWordsView(
-                        text = (currentRoute as KeyboardRoute.SplitWords).text,
-                        backgroundColor = keyboardBgColor,
-                        onBack = { currentRoute = KeyboardRoute.Clipboard(clipboardTab) },
-                        onAddQuickSendText = { text -> onAddQuickSendText?.invoke(text) },
-                        onNavigateToQuickSend = { currentRoute = KeyboardRoute.Clipboard(1) },
-                        onSelectChar = { char -> onCommitText?.invoke(char) },
-                        onDeleteText = { count -> onDeleteText?.invoke(count) },
-                        bottomPaddingDp = keyboardBottomPaddingDp,
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                        text = (currentRoute as KeyboardRoute.SplitWords).text, backgroundColor = keyboardBgColor,
+                        onBack = { currentRoute = KeyboardRoute.Clipboard(clipboardTab) }, onAddQuickSendText = { text -> onAddQuickSendText?.invoke(text) },
+                        onNavigateToQuickSend = { currentRoute = KeyboardRoute.Clipboard(1) }, onSelectChar = { char -> onCommitText?.invoke(char) },
+                        onDeleteText = { count -> onDeleteText?.invoke(count) }, bottomPaddingDp = keyboardBottomPaddingDp, modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.Symbol -> SymbolKeyboardLayout(
-                        onSelect = { symbol ->
-                            if (symbol == "delete") {
-                                onKeyPress("delete", false)
-                            } else {
-                                onCommitText?.invoke(symbol)
-                            }
-                        },
-                        onBack = { currentRoute = KeyboardRoute.Keyboard },
-                        backgroundColor = candidateBarBg,
-                        textColor = keyTextColor,
-                        accentColor = accentColor,
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                        onSelect = { symbol -> if (symbol == "delete") onKeyPress("delete", false) else onCommitText?.invoke(symbol) },
+                        onBack = { currentRoute = KeyboardRoute.Keyboard }, backgroundColor = candidateBarBg, textColor = keyTextColor, accentColor = accentColor, modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is KeyboardRoute.Emoji -> EmojiKeyboardLayout(
-                        onEmojiSelect = { emoji ->
-                            if (emoji == "delete") {
-                                onKeyPress("delete", false)
-                            } else {
-                                onCommitText?.invoke(emoji)
-                            }
-                        },
-                        onImageEmojiSelect = onCommitImage,
-                        onBack = { currentRoute = KeyboardRoute.Keyboard },
-                        backgroundColor = candidateBarBg,
-                        textColor = keyTextColor,
-                        accentColor = accentColor,
-                        bottomPaddingDp = keyboardBottomPaddingDp,
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                        onEmojiSelect = { emoji -> if (emoji == "delete") onKeyPress("delete", false) else onCommitText?.invoke(emoji) },
+                        onImageEmojiSelect = onCommitImage, onBack = { currentRoute = KeyboardRoute.Keyboard }, backgroundColor = candidateBarBg, textColor = keyTextColor, accentColor = accentColor,
+                        bottomPaddingDp = keyboardBottomPaddingDp, modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     else -> {}
                 }
