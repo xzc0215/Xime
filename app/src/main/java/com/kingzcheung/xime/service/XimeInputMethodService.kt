@@ -92,6 +92,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
+import kotlin.math.min // 引入 Kotlin 原生 min 函數
 
 class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, ActionExecutor {    
     companion object {        
@@ -400,8 +401,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val isLandscape = resources.configuration.screenWidthDp > screenHeightDp                
                 val orientationHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                
                 
-                // 修正：強轉 Float 後呼叫 Math.min 避免 Argument type mismatch 錯誤
-                val displayHeight = Math.min(orientationHeight.toFloat(), maxHeightDp.toFloat()).toInt()                
+                // 修正：這裡改用 Kotlin 內建的 min(Int, Int) 函數，完美避免與 Java Math.min(Float, Float) 的歧義衝突
+                val displayHeight = min(orientationHeight, maxHeightDp)                
                 
                 val keyboardHeight = if (state.showKeyboardResize) {                    
                     if (isLandscape) (screenHeightDp * 7) / 10 else maxHeightDp + 100                
@@ -514,7 +515,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             val isLandscape = config.screenWidthDp > config.screenHeightDp                                
                                             val currentHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)                                
                                             val maxHeightDp = (config.screenHeightDp * 3) / 5                                
-                                            val displayHeight = Math.min(currentHeight.toFloat(), maxHeightDp.toFloat()).toInt()                                
+                                            val displayHeight = min(currentHeight, maxHeightDp)                                
                                             uiState.value = uiState.value.copy(                                    
                                                 showKeyboardResize = true,                                    
                                                 keyboardHeightDp = currentHeight,                                    
