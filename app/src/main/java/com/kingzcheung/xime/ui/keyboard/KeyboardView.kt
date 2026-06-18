@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,9 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEvent
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlin.math.abs
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -277,47 +272,6 @@ fun KeyboardView(
                     )
                 }
                 else -> {
-                    // 全局手势拦截器：屏蔽左右滑和上滑，仅放行下滑给底层按键
-                    val customGestureMod = Modifier.pointerInput(Unit) {
-                        val thresholdPx = 25.dp.toPx()
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            var blockGesture = false
-                            do {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                val dx = change.position.x - down.position.x
-                                val dy = change.position.y - down.position.y
-
-                                if (!change.pressed) {
-                                    if (blockGesture) {
-                                        event.changes.forEach { it.consume() }
-                                    }
-                                    break
-                                }
-
-                                // 如果已经判定为需要屏蔽的手势，后续所有移动直接消费掉
-                                if (blockGesture) {
-                                    event.changes.forEach { it.consume() }
-                                    continue
-                                }
-
-                                // 滑动距离超过阈值时，判断方向
-                                if (abs(dx) > thresholdPx || abs(dy) > thresholdPx) {
-                                    if (dy > 0 && dy > abs(dx)) {
-                                        // 【下滑】 (垂直距离大于水平距离，且向下)
-                                        // 不调用 consume()，让事件穿透到底层按键(Key)去触发它自带的下滑快捷符号逻辑
-                                    } else {
-                                        // 【上滑、左滑、右滑】
-                                        // 立即消费事件，阻止底层按键和光标移动逻辑收到这些滑动
-                                        event.changes.forEach { it.consume() }
-                                        blockGesture = true
-                                    }
-                                }
-                            } while (true)
-                        }
-                    }
-
                     val fullScreenOnKeyPress: (String) -> Unit = { key ->
                         when (key) {
                             "shift" -> isShifted = !isShifted
@@ -380,14 +334,58 @@ fun KeyboardView(
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp,
                         shadowShapeRadius = kbShadow.shapeRadius.dp,
-                        modifier = Modifier.weight(1f).then(customGestureMod),
+                        modifier = Modifier.weight(1f), // 保持纯净的权重修饰符，避免上层拦截导致底层手势失效
                         onKeyPressDown = onKeyPressDown,
                         onVoiceModeChange = onVoiceModeChange,
                         onCommitText = onCommitText,
                         isSttEnabled = isSttEnabled,
                         isVoiceMode = isVoiceMode,
                         onCursorMove = onCursorMove,
-                        onGestureAction = onGestureAction,
+                        onGestureAction = { action, key ->
+                            // 核心自定义逻辑：当捕获到单个按键的下滑手势时，映射并直接上屏辅助符号/数字
+                            if (action == GestureAction.SWIPE_DOWN) {
+                                val alternateText = when (key.lowercase()) {
+                                    // 第一排：字母对应数字
+                                    "q" -> "1"
+                                    "w" -> "2"
+                                    "e" -> "3"
+                                    "r" -> "4"
+                                    "t" -> "5"
+                                    "y" -> "6"
+                                    "u" -> "7"
+                                    "i" -> "8"
+                                    "o" -> "9"
+                                    "p" -> "0"
+                                    // 第二排：字母对应常见符号
+                                    "a" -> "@"
+                                    "s" -> "#"
+                                    "d" -> "$"
+                                    "f" -> "&"
+                                    "g" -> "*"
+                                    "h" -> "-"
+                                    "j" -> "+"
+                                    "k" -> "("
+                                    "l" -> ")"
+                                    // 第三排：字母对应常见符号
+                                    "z" -> "!"
+                                    "x" -> "_"
+                                    "c" -> "\""
+                                    "v" -> "'"
+                                    "b" -> ":"
+                                    "n" -> ";"
+                                    "m" -> "?"
+                                    else -> null
+                                }
+                                if (alternateText != null) {
+                                    onCommitText?.invoke(alternateText)
+                                } else {
+                                    onGestureAction?.invoke(action, key)
+                                }
+                            } else {
+                                // 其它手势（如左滑、右滑、上滑）依然走系统原定的回调逻辑
+                                onGestureAction?.invoke(action, key)
+                            }
+                        },
                         currentSchemaId = currentSchemaId,
                     )
                 }
