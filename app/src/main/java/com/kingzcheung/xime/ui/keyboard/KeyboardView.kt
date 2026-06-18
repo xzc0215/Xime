@@ -39,7 +39,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
-import kotlin.math.abs
+import Math.abs
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,30 +58,9 @@ import com.kingzcheung.xime.ui.settings.SchemaListView
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.keyboard.GestureAction
 
-val LocalStretchFactor = compositionLocalOf { 1f }
+// 移除了所有導致編譯衝突的模擬 Stub Class 宣告，直接呼叫專案真實組件
 
-// 模擬組件存根（若編譯報錯，請移除此段並導入你專案中實際的組件）
-@Composable fun CandidateBar(candidates: List<String>, candidateComments: List<String>, inputText: String, isComposing: Boolean, currentRoute: KeyboardRoute, associationCandidates: List<String>, toolbarActions: List<ToolbarAction>, visuals: CandidateBarVisuals, callbacks: CandidateBarCallbacks) {}
-data class CandidateBarVisuals(val backgroundColor: Color, val showClipboardHeader: Boolean, val textColor: Color, val dividerColor: Color, val accentColor: Color, val isDarkTheme: Boolean)
-data class CandidateBarCallbacks(val onCandidateSelect: (Int) -> Unit, val onLogoClick: () -> Unit, val onBack: () -> Unit, val onHideKeyboard: () -> Unit, val onShowMoreCandidates: () -> Unit, val onInputTextClick: () -> Unit, val onAssociationSelect: ((Int) -> Unit)?)
-@Composable fun VoiceKeyboardLayout(keyBackgroundColor: Color, keyTextColor: Color, specialKeyBackgroundColor: Color, keyboardBackgroundColor: Color, modifier: Modifier, isDarkTheme: Boolean, themeId: String, bottomActive: Boolean, leftActive: Boolean, rightActive: Boolean, pluginName: String, recognitionState: RecognitionState, recognizedText: String, amplitude: Float) {}
-@Composable fun KeyboardLayoutScreen(state: KeyboardLayoutState, onKeyPress: (String) -> Unit, isShifted: Boolean, isAsciiMode: Boolean, isLandscape: Boolean, schemaName: String, enterKeyText: String, isDarkTheme: Boolean, keyBackgroundColor: Color, keyTextColor: Color, specialKeyBackgroundColor: Color, keyboardBackgroundColor: Color, shadowEnabled: Boolean, shadowElevation: Float, shadowShapeRadius: Float, modifier: Modifier, onKeyPressDown: ((String) -> Unit)?, onVoiceModeChange: ((Boolean) -> Unit)?, onCommitText: ((String) -> Unit)?, isSttEnabled: Boolean, isVoiceMode: Boolean, onCursorMove: ((Int) -> Unit)?, onGestureAction: ((GestureAction, String) -> Unit)?, currentSchemaId: String) {}
-sealed class KeyboardLayoutState {
-    object Chinese : KeyboardLayoutState()
-    object English : KeyboardLayoutState()
-    object Number : KeyboardLayoutState()
-    object Symbol : KeyboardLayoutState()
-    fun transition(action: KeyboardLayoutAction, isAsciiMode: Boolean): KeyboardLayoutState = this
-}
-sealed class KeyboardLayoutAction { object SwitchToNumber : KeyboardLayoutAction(); object SwitchToFull : KeyboardLayoutAction() }
-fun initialKeyboardLayoutState(isAsciiMode: Boolean): KeyboardLayoutState = KeyboardLayoutState.Chinese
-@Composable fun MenuBar(isVisible: Boolean, isDarkTheme: Boolean, darkMode: Int, backgroundColor: Color, bottomPaddingDp: Int, onDismiss: () -> Unit, onClipboard: () -> Unit, onQuickSend: () -> Unit, onKeyboardResize: () -> Unit, onEmoji: () -> Unit, onReloadConfig: () -> Unit, onSettings: () -> Unit, onSchemaList: () -> Unit, onToggleDarkMode: () -> Unit, onToolbarCustomize: () -> Unit, modifier: Modifier) {}
-@Composable fun ClipboardView(clipboardItems: List<ClipboardItem>, quickSendItems: List<ClipboardItem>, selectedTab: Int, isDarkTheme: Boolean, backgroundColor: Color, onSelectItem: (String) -> Unit, onRemoveItem: (Long) -> Unit, onAddToQuickSend: (Long) -> Unit, onSplitWords: (String, Long) -> Unit, onRemoveFromQuickSend: (Long) -> Unit, onBack: () -> Unit, onClipboardTabChange: (Int) -> Unit, bottomPaddingDp: Int, modifier: Modifier) {}
-@Composable fun ToolbarCustomizeView(toolbarButtons: List<String>, keyTextColor: Color, keyBgColor: Color, accentColor: Color, onUpdateToolbarButtons: ((List<String>) -> Unit)?, onDismiss: () -> Unit, bottomPaddingDp: Int, modifier: Modifier) {}
-@Composable fun CandidatePage(candidates: List<String>, candidateComments: List<String>, associationCandidates: List<String>, inputText: String, onCandidateSelect: (Int) -> Unit, onAssociationSelect: ((Int) -> Unit)?, backgroundColor: Color, textColor: Color, hasNextPage: Boolean, hasPrevPage: Boolean, onPageDown: (() -> Unit)?, onPageUp: (() -> Unit)?, onBack: () -> Unit, bottomPaddingDp: Int, modifier: Modifier) {}
-@Composable fun SplitWordsView(text: String, backgroundColor: Color, onBack: () -> Unit, onAddQuickSendText: ((String) -> Unit)?, onNavigateToQuickSend: () -> Unit, onSelectChar: ((String) -> Unit)?, onDeleteText: ((Int) -> Unit)?, bottomPaddingDp: Int, modifier: Modifier) {}
-@Composable fun SymbolKeyboardLayout(onSelect: (String) -> Unit, onBack: () -> Unit, backgroundColor: Color, textColor: Color, accentColor: Color, modifier: Modifier) {}
-@Composable fun EmojiKeyboardLayout(onEmojiSelect: (String) -> Unit, onImageEmojiSelect: ((String) -> Unit)?, onBack: () -> Unit, backgroundColor: Color, textColor: Color, accentColor: Color, bottomPaddingDp: Int, modifier: Modifier) {}
+val LocalStretchFactor = compositionLocalOf { 1f }
 
 @Composable
 fun KeyboardView(
@@ -182,7 +161,6 @@ fun KeyboardView(
     LaunchedEffect(state.inputSessionId) { currentRoute = KeyboardRoute.Keyboard }
     LaunchedEffect(isAsciiMode) { keyboardState = initialKeyboardLayoutState(isAsciiMode) }
 
-    // ─── 頂部外殼圓角 ───
     val topRoundedShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
 
     Box(
@@ -191,10 +169,10 @@ fun KeyboardView(
             .fillMaxHeight()
             .graphicsLayer {
                 shape = topRoundedShape
-                clip = true // 開啟圖層裁剪，搭配 Window 透明消滅死黑邊
+                clip = true 
             }
     ) {
-        // 【第一層：抽離出來的毛玻璃背景層】
+        // 第一層：獨立毛玻璃濾鏡背景
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -209,7 +187,7 @@ fun KeyboardView(
                 .background(keyboardBgColor.copy(alpha = 0.55f))
         )
 
-        // 【第二層：清晰的 UI 內容互動層】（內置下滑攔截，防止手勢衝突）
+        // 第二層：UI 與交互層
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -217,10 +195,8 @@ fun KeyboardView(
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
-                            val totalX = abs(dragAmount.x)
-                            val totalY = abs(dragAmount.y)
-
-                            // 當下滑手勢（Y 軸 > 0）的趨勢明顯大於左右滑動時，視為快捷輸入觸發，消耗此事件避免與左右滑滑動衝突
+                            val totalX = abs(dragAmount.x.toDouble()).toFloat()
+                            val totalY = abs(dragAmount.y.toDouble()).toFloat()
                             if (dragAmount.y > 0 && totalY > totalX * 1.5f) {
                                 change.consume()
                             }
@@ -252,7 +228,7 @@ fun KeyboardView(
                     ToolbarAction(button, onClick)
                 },
                 visuals = CandidateBarVisuals(
-                    backgroundColor = candidateBarBg.copy(alpha = 0.3f), // 降透明度使底層毛玻璃透出
+                    backgroundColor = candidateBarBg.copy(alpha = 0.3f), 
                     showClipboardHeader = candState.isShowingRecentClipboard,
                     textColor = candidateTextColor,
                     dividerColor = dividerColor,
@@ -296,7 +272,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 設為透明，不擋底層毛玻璃
+                        keyboardBackgroundColor = Color.Transparent, 
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme,
                         themeId = themeId,
@@ -359,7 +335,7 @@ fun KeyboardView(
                         keyBackgroundColor = keyBgColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBgColor,
-                        keyboardBackgroundColor = Color.Transparent, // 設為透明，不擋底層毛玻璃
+                        keyboardBackgroundColor = Color.Transparent, 
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp.value,
                         shadowShapeRadius = kbShadow.shapeRadius.dp.value,
@@ -376,8 +352,8 @@ fun KeyboardView(
                 }
             }
 
-            val gapAbove = maxOf(0, keyboardBottomPaddingDp)
-            val bottomReduction = minOf(0, keyboardBottomPaddingDp)
+            val gapAbove = Math.max(0, keyboardBottomPaddingDp)
+            val bottomReduction = Math.min(0, keyboardBottomPaddingDp)
             Spacer(modifier = Modifier.height(gapAbove.dp))
 
             val configuration = LocalConfiguration.current
@@ -429,7 +405,6 @@ fun KeyboardView(
             }
         }
 
-        // 部署覆蓋層
         if (isDeploying) {
             val isError = deploymentMessage.contains("超时") || deploymentMessage.contains("失败")
             Box(
@@ -450,7 +425,6 @@ fun KeyboardView(
             }
         }
 
-        // 路由分發子頁面（剪貼簿、選單、符號鍵盤等）
         if (currentRoute !is KeyboardRoute.Keyboard && !isVoiceMode) {
             Box(
                 modifier = Modifier
@@ -478,7 +452,7 @@ fun KeyboardView(
                         onSelectItem = { text -> onClipboardSelect?.invoke(text); currentRoute = KeyboardRoute.Keyboard },
                         onRemoveItem = { id -> onClipboardRemove?.invoke(id) },
                         onAddToQuickSend = { id -> onAddToQuickSend?.invoke(id) },
-                        onSplitWords = { text, _ -> currentRoute = KeyboardRoute.SplitWords(text) },
+                        onSplitWords = { text, id -> currentRoute = KeyboardRoute.SplitWords(text) },
                         onRemoveFromQuickSend = { id -> onRemoveFromQuickSend?.invoke(id) },
                         onBack = { currentRoute = KeyboardRoute.Keyboard },
                         onClipboardTabChange = { currentRoute = KeyboardRoute.Clipboard(it) },
