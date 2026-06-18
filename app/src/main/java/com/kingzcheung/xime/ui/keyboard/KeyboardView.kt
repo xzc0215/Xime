@@ -264,12 +264,12 @@ fun KeyboardView(
                     )
                 }
                 else -> {
-                    // 全局手势重塑：拦截所有滑动，删除上滑/左右滑，仅保留下滑触发快捷符号
+                    // 全局手势拦截器：屏蔽左右滑和上滑，仅放行下滑给底层按键
                     val customGestureMod = Modifier.pointerInput(Unit) {
-                        val swipeThresholdPx = 25.dp.toPx() // 判定滑动的距离阈值
+                        val thresholdPx = 25.dp.toPx()
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
-                            var gestureTriggered = false
+                            var blockGesture = false
                             do {
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -277,26 +277,28 @@ fun KeyboardView(
                                 val dy = change.position.y - down.position.y
 
                                 if (!change.pressed) {
+                                    if (blockGesture) {
+                                        event.changes.forEach { it.consume() }
+                                    }
                                     break
                                 }
 
-                                // 当手指移动距离超过阈值时，判定为滑动操作
-                                if (abs(dx) > swipeThresholdPx || abs(dy) > swipeThresholdPx) {
-                                    // 核心改动：立即消费(consume)当前手势事件
-                                    // 这样底层的按键就无法收到滑动的位移信息，直接废除了原生的左右滑、上滑逻辑
+                                // 如果已经判定为需要屏蔽的手势，后续所有移动直接消费掉
+                                if (blockGesture) {
                                     event.changes.forEach { it.consume() }
+                                    continue
+                                }
 
-                                    if (!gestureTriggered) {
-                                        if (abs(dy) > abs(dx)) {
-                                            // 垂直方向滑动
-                                            if (dy > 0) {
-                                                // 【下滑】：直接让当前路由切换到快捷符号面板
-                                                currentRoute = KeyboardRoute.Symbol
-                                            }
-                                            // 【上滑】 (dy < 0)：由于已被 consume() 拦截且此处无逻辑，直接失效
-                                        }
-                                        // 【左右滑动】：由于已被 consume() 拦截且此处无逻辑，原光标移动直接失效
-                                        gestureTriggered = true
+                                // 滑动距离超过阈值时，判断方向
+                                if (abs(dx) > thresholdPx || abs(dy) > thresholdPx) {
+                                    if (dy > 0 && dy > abs(dx)) {
+                                        // 【下滑】 (垂直距离大于水平距离，且向下)
+                                        // 不调用 consume()，让事件穿透到底层按键(Key)去触发它自带的下滑快捷符号逻辑
+                                    } else {
+                                        // 【上滑、左滑、右滑】
+                                        // 立即消费事件，阻止底层按键和光标移动逻辑收到这些滑动
+                                        event.changes.forEach { it.consume() }
+                                        blockGesture = true
                                     }
                                 }
                             } while (true)
